@@ -15,13 +15,13 @@ const About = () => {
             About <span className="text-gradient">Me</span>
           </h2>
 
-          <div className="space-y-6 text-lg leading-relaxed text-foreground/90 font-body">
+          <div className="space-y-6 text-lg leading-relaxed text-foreground/90 font-body text-justify">
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1, duration: 0.6 }}
-              className="first-letter:text-5xl first-letter:font-display first-letter:text-primary first-letter:mr-2 first-letter:float-left"
+              className="first-letter:text-5xl first-letter:font-display first-letter:text-primary first-letter:mr-2 first-letter:float-left first-letter:leading-none"
             >
               Hello there, I'm a full-stack developer with a love for exploring the world and capturing its beauty through my lens. My obsession with coding is like a never-ending romance that just keeps getting stronger with each new technology I learn.
             </motion.p>
@@ -58,7 +58,7 @@ const About = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.5, duration: 0.6 }}
-              className="text-muted-foreground italic"
+              className="text-muted-foreground italic text-center"
             >
               Feeling curious? Go ahead and click those icons below to take a closer peek into my world. Don't worry, it's not creepy if I've given you permission, right?
             </motion.p>
@@ -72,7 +72,7 @@ const About = () => {
             transition={{ delay: 0.6, duration: 0.6 }}
             className="mt-12 p-6 bg-card rounded-2xl border border-border shadow-soft"
           >
-            <p className="text-foreground/90 mb-4">
+            <p className="text-foreground/90 mb-4 text-justify">
               And finally, if you've ever felt the urge to share something with me without the fuss of revealing your true identity, look no further:
             </p>
             <a
