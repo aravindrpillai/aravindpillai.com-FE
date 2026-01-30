@@ -1,5 +1,8 @@
 import { motion } from "framer-motion";
+import { BookOpen, Video } from "lucide-react";
+import { Link } from "react-router-dom";
 import SocialLinks from "./SocialLinks";
+import profileImage from "@/assets/profile.png";
 
 const Hero = () => {
   return (
@@ -11,10 +14,12 @@ const Hero = () => {
           transition={{ duration: 0.8 }}
           className="mb-8"
         >
-          <div className="w-32 h-32 md:w-40 md:h-40 mx-auto rounded-full bg-gradient-warm p-1 shadow-glow animate-float">
-            <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
-              <span className="text-5xl md:text-6xl font-display font-bold text-gradient">A</span>
-            </div>
+          <div className="w-36 h-36 md:w-44 md:h-44 mx-auto rounded-full bg-gradient-warm p-1 shadow-glow animate-float">
+            <img
+              src={profileImage}
+              alt="Aravind Ramachandran Pillai"
+              className="w-full h-full rounded-full object-cover"
+            />
           </div>
         </motion.div>
 
@@ -36,6 +41,29 @@ const Hero = () => {
         >
           Fullstack Developer | Science Enthusiast | Hobbyist Photographer
         </motion.p>
+
+        {/* Navigation Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.6 }}
+          className="flex flex-wrap justify-center gap-4 mb-8"
+        >
+          <Link
+            to="/blog"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-card border border-border rounded-full font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 shadow-soft hover:shadow-glow"
+          >
+            <BookOpen size={18} />
+            Blog & Articles
+          </Link>
+          <Link
+            to="/videos"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-card border border-border rounded-full font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 shadow-soft hover:shadow-glow"
+          >
+            <Video size={18} />
+            My Videos
+          </Link>
+        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
