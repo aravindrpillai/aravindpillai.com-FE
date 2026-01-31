@@ -7,6 +7,9 @@ import Index from "./pages/Index";
 import Blog from "./pages/Blog";
 import Videos from "./pages/Videos";
 import Photos from "./pages/Photos";
+import Anonymous from "./pages/Anonymous";
+import QChat from "./pages/QChat";
+import QChats from "./pages/QChats";
 import NotFound from "./pages/NotFound";
 import Anonymous from "./pages/anonymous/Anonymous";
 import QChat from "./pages/qchat/QChat";
@@ -35,7 +38,7 @@ const App = () => (
           <Route path="/qchat/:conversationName/:personName" element={<QChat />} />
           <Route path="/qchats" element={<QChats />} />
           
-          
+
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
