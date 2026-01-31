@@ -76,7 +76,7 @@ const About = () => {
               And finally, if you've ever felt the urge to share something with me without the fuss of revealing your true identity, look no further:
             </p>
             <a
-              href="#"
+              href="/anonymous"
               className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium transition-colors"
             >
               <ExternalLink size={18} />
