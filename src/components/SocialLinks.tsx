@@ -2,11 +2,11 @@ import { Github, Facebook, Instagram, Linkedin, MessageCircle, Mail, Phone, Arro
 import { motion } from "framer-motion";
 
 const socialLinks = [
-  { icon: Github, href: "https://github.com", label: "GitHub" },
-  { icon: Facebook, href: "https://facebook.com", label: "Facebook" },
-  { icon: Instagram, href: "https://instagram.com", label: "Instagram" },
-  { icon: Linkedin, href: "https://linkedin.com", label: "LinkedIn" },
-  { icon: MessageCircle, href: "https://wa.me/", label: "WhatsApp" },
+  { icon: Github, href: "https://github.com/aravindrpillai", label: "GitHub" },
+  { icon: Facebook, href: "https://facebook.com/aravind.pillai.948", label: "Facebook" },
+  { icon: Instagram, href: "https://instagram.com/aravind.ramachandran.pillai/", label: "Instagram" },
+  { icon: Linkedin, href: "https://linkedin.com/in/aravindrpillai1992", label: "LinkedIn" },
+  { icon: MessageCircle, href: "https://wa.me/+919447020535", label: "WhatsApp" },
 ];
 
 interface SocialLinksProps {

@@ -30,12 +30,12 @@ const Hero = () => {
         </motion.div>
 
         <motion.h1
-          className="text-4xl md:text-6xl lg:text-7xl font-display font-bold mb-6 tracking-tight"
+          className="text-4xl md:text-6xl lg:text-5xl font-display font-bold mb-6 tracking-tight"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.8 }}
         >
-          Aravind R <span className="text-gradient">Pillai</span>
+          Aravind <span className="text-gradient">Ramachandran </span> Pillai
         </motion.h1>
 
         {/* Animated Tagline */}
@@ -74,7 +74,7 @@ const Hero = () => {
         </motion.div>
 
         {/* Navigation Buttons */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8, duration: 0.6 }}
@@ -101,7 +101,7 @@ const Hero = () => {
             <Camera size={18} />
             Photos
           </Link>
-        </motion.div>
+        </motion.div> */}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -127,7 +127,6 @@ const Hero = () => {
               animate={{ y: [0, 5, 0] }}
               transition={{ repeat: Infinity, duration: 1.5 }}
             >
-              ↓
             </motion.div>
           </a>
         </motion.div>

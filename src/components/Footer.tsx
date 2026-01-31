@@ -11,18 +11,18 @@ const Footer = () => {
           {/* Contact Info */}
           <div className="flex flex-col sm:flex-row items-center gap-6 text-sm text-muted-foreground">
             <a
-              href="mailto:aravind@example.com"
+              href="mailto:hello@aravindpillai.com"
               className="flex items-center gap-2 hover:text-primary transition-colors"
             >
               <Mail size={16} />
-              aravind@example.com
+              hello@aravindpillai.com
             </a>
             <a
-              href="tel:+1234567890"
+              href="tel:+14168547092"
               className="flex items-center gap-2 hover:text-primary transition-colors"
             >
               <Phone size={16} />
-              +1 (234) 567-890
+              +1 (416) 854-7092
             </a>
           </div>
 
@@ -34,7 +34,7 @@ const Footer = () => {
         <div className="mt-8 pt-8 border-t border-border text-center">
           <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
             © {currentYear} Aravind Ramachandran Pillai. Made with{" "}
-            <Heart size={14} className="text-primary fill-primary" /> in Canada
+            <Heart size={14} className="text-primary fill-primary" />
           </p>
         </div>
       </div>

@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
 import { ExternalLink, TrendingUp, BarChart3 } from "lucide-react";
+import InstaLink from "./PhotgraphyLink";
+import SocialLinks from "./SocialLinks";
 
 const About = () => {
   return (
@@ -32,7 +34,9 @@ const About = () => {
               viewport={{ once: true }}
               transition={{ delay: 0.2, duration: 0.6 }}
             >
-              I have an undying passion for photography, constantly seeking out new destinations to explore and capture their beauty through my lens. However, despite my best efforts, my wife often teases me that my photography skills are hit or miss - and to be honest, it's usually more miss than hit. But I don't let that stop me from snapping away!
+              I have an undying passion for photography, constantly seeking out new destinations to explore and capture their beauty through my lens. However, despite my best efforts, my wife often teases me that my&nbsp;
+              <InstaLink />
+              &nbsp;are hit or miss - and to be honest, it's usually more miss than hit. But I don't let that stop me from snapping away!
             </motion.p>
 
             <motion.p
@@ -58,10 +62,21 @@ const About = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.5, duration: 0.6 }}
-              className="text-muted-foreground italic text-center"
+              className="text-muted-foreground italic"
             >
               Feeling curious? Go ahead and click those icons below to take a closer peek into my world. Don't worry, it's not creepy if I've given you permission, right?
+              <br /><br />
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.9, duration: 0.6 }}
+                className="flex justify-center"
+              >
+                <SocialLinks size="lg" />
+              </motion.div>
             </motion.p>
+
+
           </div>
 
           {/* Anonymous Message & Stock Analyzer Links */}
@@ -76,14 +91,14 @@ const About = () => {
               And finally, if you've ever felt the urge to share something with me without the fuss of revealing your true identity, look no further:
             </p>
             <a
-              href="#"
+              href="/anonymous"
               className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium transition-colors"
             >
               <ExternalLink size={18} />
               Send an anonymous message
             </a>
 
-            <div className="mt-6 pt-6 border-t border-border">
+            {/* <div className="mt-6 pt-6 border-t border-border">
               <p className="text-foreground/90 mb-4">
                 Interested in the stock market? Check out my prediction analyzer:
               </p>
@@ -103,7 +118,9 @@ const About = () => {
                   Intraday
                 </a>
               </div>
-            </div>
+            </div> */}
+
+            
           </motion.div>
         </motion.div>
       </div>
