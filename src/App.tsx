@@ -9,6 +9,7 @@ import Videos from "./pages/Videos";
 import Photos from "./pages/Photos";
 import Anonymous from "./pages/Anonymous";
 import QChat from "./pages/QChat";
+import QChats from "./pages/QChats";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/photos" element={<Photos />} />
           <Route path="/anonymous" element={<Anonymous />} />
           <Route path="/qchat/:conversationName/:personName" element={<QChat />} />
+          <Route path="/qchats" element={<QChats />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
