@@ -135,7 +135,7 @@ const QChat = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="min-h-screen bg-background flex flex-col"
+            className="h-screen bg-background flex flex-col overflow-hidden"
           >
             {/* Header */}
             <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur-sm">
@@ -218,7 +218,7 @@ const QChat = () => {
             </header>
 
             {/* Messages Area */}
-            <ScrollArea ref={scrollAreaRef} className="flex-1 px-3 sm:px-6">
+            <ScrollArea ref={scrollAreaRef} className="flex-1 px-3 sm:px-6 overflow-hidden">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-4">
                   <motion.div
