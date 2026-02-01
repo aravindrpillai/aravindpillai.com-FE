@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +10,7 @@ import {
 
 interface EmojiPickerProps {
   onEmojiSelect: (emoji: string) => void;
+  inline?: boolean;
 }
 
 const EMOJI_CATEGORIES = {
@@ -19,13 +20,44 @@ const EMOJI_CATEGORIES = {
   "Objects": ["🎉", "🎊", "🎈", "🎁", "🏆", "🥇", "⭐", "🌟", "✨", "💫", "🔥", "💯", "✅", "❌", "⚠️", "📌", "📍", "💡", "🔔", "🎵"],
 };
 
-const EmojiPicker = ({ onEmojiSelect }: EmojiPickerProps) => {
+const EmojiPicker = ({ onEmojiSelect, inline = false }: EmojiPickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleEmojiClick = (emoji: string) => {
     onEmojiSelect(emoji);
-    setIsOpen(false);
+    if (!inline) {
+      setIsOpen(false);
+    }
   };
+
+  const emojiGrid = (
+    <div className="space-y-3 max-h-64 overflow-y-auto">
+      {Object.entries(EMOJI_CATEGORIES).map(([category, emojis]) => (
+        <div key={category}>
+          <p className="text-xs font-medium text-muted-foreground mb-2">
+            {category}
+          </p>
+          <div className="grid grid-cols-10 gap-1">
+            {emojis.map((emoji, index) => (
+              <motion.button
+                key={index}
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => handleEmojiClick(emoji)}
+                className="w-7 h-7 flex items-center justify-center text-lg hover:bg-accent rounded transition-colors"
+              >
+                {emoji}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  if (inline) {
+    return emojiGrid;
+  }
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -44,28 +76,7 @@ const EmojiPicker = ({ onEmojiSelect }: EmojiPickerProps) => {
         align="start"
         className="w-80 p-2"
       >
-        <div className="space-y-3 max-h-64 overflow-y-auto">
-          {Object.entries(EMOJI_CATEGORIES).map(([category, emojis]) => (
-            <div key={category}>
-              <p className="text-xs font-medium text-muted-foreground mb-2">
-                {category}
-              </p>
-              <div className="grid grid-cols-10 gap-1">
-                {emojis.map((emoji, index) => (
-                  <motion.button
-                    key={index}
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => handleEmojiClick(emoji)}
-                    className="w-7 h-7 flex items-center justify-center text-lg hover:bg-accent rounded transition-colors"
-                  >
-                    {emoji}
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        {emojiGrid}
       </PopoverContent>
     </Popover>
   );

@@ -65,17 +65,25 @@ const QChat = () => {
     }
   }, [isAuthenticated]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages and initial load
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]"
-      );
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
+    const scrollToBottom = () => {
+      if (scrollAreaRef.current) {
+        const scrollElement = scrollAreaRef.current.querySelector(
+          "[data-radix-scroll-area-viewport]"
+        );
+        if (scrollElement) {
+          scrollElement.scrollTop = scrollElement.scrollHeight;
+        }
       }
-    }
-  }, [messages]);
+    };
+    
+    // Immediate scroll
+    scrollToBottom();
+    // Also scroll after a brief delay to handle async content
+    const timer = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timer);
+  }, [messages, isLoading]);
 
   const handleSendMessage = (content: string, imageUrl?: string) => {
     const newMessage: Message = {
