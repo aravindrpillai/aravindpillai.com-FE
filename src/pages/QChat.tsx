@@ -232,6 +232,7 @@ const QChat = () => {
                   {messages.map((message) => (
                     <ChatMessage
                       key={message.id}
+                      msg_sender={message.sender_name || message.sender}
                       message={message}
                       onReply={handleReply}
                       onImageClick={setPreviewImage}

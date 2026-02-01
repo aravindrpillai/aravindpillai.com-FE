@@ -146,7 +146,7 @@ export default function TextBoxPage() {
           id="text-box"
           className="textbox"
           contentEditable="true"
-          placeholder="Enter your text, paste images, or other content here..."
+          data-placeholder="Enter your text, paste images, or other content here..."
         />
 
         {loading && (
