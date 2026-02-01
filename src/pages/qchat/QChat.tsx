@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useLayoutEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Mail, Pause, Play, Trash2, Loader2 } from "lucide-react";
@@ -14,8 +14,8 @@ import CryptoJS from "crypto-js";
 
 type ApiMessage = {
   id: number;
-  sender_name: string,
-  sender: string; //me or other
+  sender_name: string;
+  sender: string; // me or other
   message: string; // encrypted
   time?: string; // backend time string
 };
@@ -40,10 +40,10 @@ const QChat = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const lastIdRef = useRef<number>(0);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
+  const lastIdRef = useRef<number>(0);
   const [startPolling, setStartPolling] = useState(false);
-  const [autoScroll, setAutoScroll] = useState(true);
 
   const convName = useMemo(() => (conversationName || "").trim(), [conversationName]);
   const senderName = useMemo(() => (personName || "").trim(), [personName]);
@@ -57,11 +57,9 @@ const QChat = () => {
   const parseTimestamp = (t?: string): Date => {
     if (!t) return new Date();
 
-    // ISO-like or general date string
     const d1 = new Date(t);
     if (!isNaN(d1.getTime())) return d1;
 
-    // time-only like "14:22:10" -> today
     if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(t)) {
       const today = new Date();
       const parts = t.split(":").map((x) => parseInt(x, 10));
@@ -118,7 +116,6 @@ const QChat = () => {
 
     lastIdRef.current = 0;
     setStartPolling(false);
-    setAutoScroll(true);
   };
 
   // On refresh, ALWAYS ask passcode again: do not persist anything.
@@ -127,6 +124,19 @@ const QChat = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convName, senderName]);
 
+  // ---------------- scroll (anchor-based, reliable with Radix ScrollArea) ----------------
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    bottomRef.current?.scrollIntoView({ behavior, block: "end" });
+  };
+
+  // Scroll when messages render (initial load + every new message)
+  useLayoutEffect(() => {
+    if (!isAuthenticated) return;
+    if (isLoading) return; // wait until the message list is actually mounted
+
+    const id = requestAnimationFrame(() => scrollToBottom("auto"));
+    return () => cancelAnimationFrame(id);
+  }, [messages, isAuthenticated, isLoading]);
 
   // ---------------- API ----------------
   const getConversations = async (
@@ -341,41 +351,6 @@ const QChat = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, startPolling, headers]);
 
-  // ---------------- scroll handling ----------------
-  const scrollToBottom = () => {
-    if (!scrollAreaRef.current) return;
-    const viewport = scrollAreaRef.current.querySelector(
-      "[data-radix-scroll-area-viewport]"
-    ) as HTMLDivElement | null;
-    if (!viewport) return;
-    viewport.scrollTop = viewport.scrollHeight;
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    if (autoScroll) scrollToBottom();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, autoScroll, isAuthenticated]);
-
-  useEffect(() => {
-    if (!scrollAreaRef.current) return;
-
-    const viewport = scrollAreaRef.current.querySelector(
-      "[data-radix-scroll-area-viewport]"
-    ) as HTMLDivElement | null;
-
-    if (!viewport) return;
-
-    const onScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = viewport;
-      const isAtBottom = scrollHeight - scrollTop <= clientHeight + 50;
-      setAutoScroll(isAtBottom);
-    };
-
-    viewport.addEventListener("scroll", onScroll);
-    return () => viewport.removeEventListener("scroll", onScroll);
-  }, [isAuthenticated]);
-
   // if missing params, show basic error state (no prompts)
   const showInvalidRoute = !convName || !senderName;
 
@@ -388,10 +363,12 @@ const QChat = () => {
     }
   }, [isPasscodeModalOpen]);
 
-
   return (
     <>
-      <PasscodeModal isOpen={!isAuthenticated && !showInvalidRoute} onVerify={handlePasscodeVerify} />
+      <PasscodeModal
+        isOpen={!isAuthenticated && !showInvalidRoute}
+        onVerify={handlePasscodeVerify}
+      />
 
       <ImagePreviewModal
         isOpen={!!previewImage}
@@ -481,11 +458,7 @@ const QChat = () => {
                       onClick={handlePause}
                       className="sm:hidden"
                     >
-                      {startPolling ? (
-                        <Pause className="w-4 h-4" />
-                      ) : (
-                        <Play className="w-4 h-4" />
-                      )}
+                      {startPolling ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                     </Button>
 
                     <Button
@@ -534,6 +507,9 @@ const QChat = () => {
                         onImageClick={setPreviewImage}
                       />
                     ))}
+
+                    {/* Scroll anchor */}
+                    <div ref={bottomRef} />
                   </div>
                 )}
               </ScrollArea>
