@@ -41,7 +41,7 @@ export default function ReadAnonymous() {
 
 
 
-  const [data, setData] = useState([
+  const [data, setData] = useState<Array<{ id: number; title: string; message: string; time?: string; location?: string; cordinates?: string; isp?: string }>>([
     { id: 1, title: "First Note", message: "This is the first message content." },
     { id: 2, title: "Second Note", message: "This is another message." },
     { id: 3, title: "Third Note", message: "Some more details go here." },

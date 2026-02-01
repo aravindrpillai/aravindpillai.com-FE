@@ -6,6 +6,7 @@ export interface Message {
   id: string;
   content: string;
   sender: "me" | "other";
+  sender_name?: string;
   timestamp: Date;
   imageUrl?: string;
 }
