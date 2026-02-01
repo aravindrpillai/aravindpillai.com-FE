@@ -12,6 +12,7 @@ import Anonymous from "./pages/anonymous/Anonymous";
 import QChat from "./pages/qchat/QChat";
 import QChats from "./pages/qchat/QChats";
 import ReadAnonymous from "./pages/anonymous/ReadAnonymous";
+import TextBoxPage from "./pages/textbox/Index";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,12 @@ const App = () => (
           <Route path="/anonymous" element={<Anonymous />} />
           <Route path="/anonymous/read" element={<ReadAnonymous />} />
           
+          {/* Textbox */}
+          <Route path="/textbox" element={<TextBoxPage />} />
+          <Route path="/textbox/:code" element={<TextBoxPage />} />
+          
+
+
           {/* Anonymous */}
           <Route path="/qchat/:conversationName/:personName" element={<QChat />} />
           <Route path="/qchats" element={<QChats />} />

@@ -122,7 +122,7 @@ const ChatInput = ({ value, onChange, onSend }: ChatInputProps) => {
             <Button
               onClick={handleSubmit}
               size="icon"
-              className="rounded-full h-11 w-11 shrink-0"
+              className="h-11 w-11 shrink-0"
               disabled={!value.trim() && !imagePreview}
               type="button"
             >
