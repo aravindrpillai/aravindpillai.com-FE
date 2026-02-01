@@ -73,7 +73,7 @@ const ChatInput = ({ value, onChange, onSend }: ChatInputProps) => {
         onClose={() => setShowImageModal(false)}
       />
       
-      <footer className="sticky bottom-0 z-50 border-t bg-background w-full">
+      <footer className="shrink-0 border-t bg-background w-full">
         <div className="p-3 sm:p-4">
           {imagePreview && (
             <motion.div
