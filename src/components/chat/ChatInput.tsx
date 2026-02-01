@@ -1,10 +1,17 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Send, ImagePlus, X, Image } from "lucide-react";
+import { Send, ImagePlus, X, Image, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import EmojiPicker from "./EmojiPicker";
 import ImagePreviewModal from "./ImagePreviewModal";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 
 interface ChatInputProps {
   value: string;
@@ -15,6 +22,7 @@ interface ChatInputProps {
 const ChatInput = ({ value, onChange, onSend }: ChatInputProps) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -41,6 +49,7 @@ const ChatInput = ({ value, onChange, onSend }: ChatInputProps) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       setImagePreview(event.target?.result as string);
+      setDrawerOpen(false);
     };
     reader.readAsDataURL(file);
   };
@@ -48,6 +57,7 @@ const ChatInput = ({ value, onChange, onSend }: ChatInputProps) => {
   const handleEmojiSelect = (emoji: string) => {
     onChange(value + emoji);
     textareaRef.current?.focus();
+    setDrawerOpen(false);
   };
 
   const removeImage = () => {
@@ -63,7 +73,7 @@ const ChatInput = ({ value, onChange, onSend }: ChatInputProps) => {
         onClose={() => setShowImageModal(false)}
       />
       
-      <footer className="sticky bottom-0 z-40 border-t bg-background/95 backdrop-blur-sm w-full overflow-hidden">
+      <footer className="sticky bottom-0 z-50 border-t bg-background w-full">
         <div className="p-3 sm:p-4">
           {imagePreview && (
             <motion.div
@@ -93,8 +103,42 @@ const ChatInput = ({ value, onChange, onSend }: ChatInputProps) => {
             </motion.div>
           )}
 
-          <div className="flex items-end gap-2 w-full">
-            <div className="flex-1 min-w-0 relative">
+          <div className="flex items-stretch gap-2 w-full">
+            {/* Drawer for emoji and image */}
+            <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+              <DrawerTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-[70px] w-11 shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="w-5 h-5" />
+                </Button>
+              </DrawerTrigger>
+              <DrawerContent>
+                <DrawerHeader>
+                  <DrawerTitle>Add to message</DrawerTitle>
+                </DrawerHeader>
+                <div className="p-4 pb-8 space-y-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start gap-3 h-12"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <ImagePlus className="w-5 h-5" />
+                    Add Image
+                  </Button>
+                  <div className="border rounded-lg p-3">
+                    <p className="text-sm font-medium text-muted-foreground mb-3">Emojis</p>
+                    <EmojiPicker onEmojiSelect={handleEmojiSelect} inline />
+                  </div>
+                </div>
+              </DrawerContent>
+            </Drawer>
+
+            <div className="flex-1 min-w-0">
               <Textarea
                 ref={textareaRef}
                 value={value}
@@ -102,27 +146,14 @@ const ChatInput = ({ value, onChange, onSend }: ChatInputProps) => {
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message..."
                 rows={2}
-                className="resize-none pr-20 rounded-2xl bg-muted/50 border-0 focus-visible:ring-1 h-[70px] leading-relaxed py-3 w-full"
+                className="resize-none rounded-2xl bg-muted/50 border-0 focus-visible:ring-1 h-[70px] leading-relaxed py-3 w-full"
               />
-
-              <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <ImagePlus className="w-5 h-5" />
-                </Button>
-              </div>
             </div>
 
             <Button
               onClick={handleSubmit}
               size="icon"
-              className="h-11 w-11 shrink-0"
+              className="h-[70px] w-11 shrink-0"
               disabled={!value.trim() && !imagePreview}
               type="button"
             >
