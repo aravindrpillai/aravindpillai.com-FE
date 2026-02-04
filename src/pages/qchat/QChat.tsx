@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useLayoutEffect } from "react";
+import { useState, useEffect, useRef, useMemo, useLayoutEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Mail, Pause, Play, Trash2, Loader2 } from "lucide-react";
@@ -27,7 +27,6 @@ const QChat = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Keep state passcode only for UI; use ref for crypto to avoid stale state timing issues.
   const [passcode, setPasscode] = useState("");
   const passcodeRef = useRef<string>("");
 
@@ -36,14 +35,16 @@ const QChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
 
-  // Image upload ignored; preview modal kept for design compatibility
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const inputBarRef = useRef<HTMLDivElement | null>(null);
 
   const lastIdRef = useRef<number>(0);
   const [startPolling, setStartPolling] = useState(false);
+
+  const [inputBarHeight, setInputBarHeight] = useState<number>(0);
 
   const convName = useMemo(() => (conversationName || "").trim(), [conversationName]);
   const senderName = useMemo(() => (personName || "").trim(), [personName]);
@@ -124,19 +125,43 @@ const QChat = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convName, senderName]);
 
-  // ---------------- scroll (anchor-based, reliable with Radix ScrollArea) ----------------
-  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
-    bottomRef.current?.scrollIntoView({ behavior, block: "end" });
-  };
+  // --------- keep input bar height in sync (prevents gap + prevents hiding) ----------
+  useLayoutEffect(() => {
+    const el = inputBarRef.current;
+    if (!el) return;
 
-  // Scroll when messages render (initial load + every new message)
+    const update = () => {
+      const h = el.getBoundingClientRect().height;
+      setInputBarHeight(Math.max(0, Math.round(h)));
+    };
+
+    update();
+
+    // ResizeObserver handles textarea growth etc.
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [isAuthenticated]);
+
+  // ---------------- scroll to bottom ----------------
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    // Use rAF so DOM has updated (new messages rendered)
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior, block: "end" });
+    });
+  }, []);
+
+  // Always scroll to bottom when messages change (as requested)
   useLayoutEffect(() => {
     if (!isAuthenticated) return;
-    if (isLoading) return; // wait until the message list is actually mounted
-
-    const id = requestAnimationFrame(() => scrollToBottom("auto"));
-    return () => cancelAnimationFrame(id);
-  }, [messages, isAuthenticated, isLoading]);
+    if (isLoading) return;
+    scrollToBottom("smooth");
+  }, [messages.length, isAuthenticated, isLoading, scrollToBottom]);
 
   // ---------------- API ----------------
   const getConversations = async (
@@ -190,7 +215,6 @@ const QChat = () => {
       return;
     }
 
-    // IMPORTANT: set ref BEFORE any decrypt work
     passcodeRef.current = codeFromModal;
     setPasscode(codeFromModal);
 
@@ -218,6 +242,9 @@ const QChat = () => {
 
       setIsAuthenticated(true);
       setStartPolling(true);
+
+      // ensure we land at bottom on first load
+      requestAnimationFrame(() => scrollToBottom("auto"));
     } catch (e) {
       toast.error("Wrong code or access denied.");
       resetToUnauthed();
@@ -233,7 +260,6 @@ const QChat = () => {
 
     try {
       const url = ApiClient.buildFullUrl(import.meta.env.VITE_QUICK_CHAT_CONVERSATIONS);
-
       const encryptedMsg = CryptoJS.AES.encrypt(content, passcodeRef.current).toString();
 
       const resp = await fetch(url, {
@@ -353,7 +379,6 @@ const QChat = () => {
 
   // if missing params, show basic error state (no prompts)
   const showInvalidRoute = !convName || !senderName;
-
   const isPasscodeModalOpen = !isAuthenticated && !showInvalidRoute;
 
   useEffect(() => {
@@ -365,10 +390,7 @@ const QChat = () => {
 
   return (
     <>
-      <PasscodeModal
-        isOpen={!isAuthenticated && !showInvalidRoute}
-        onVerify={handlePasscodeVerify}
-      />
+      <PasscodeModal isOpen={!isAuthenticated && !showInvalidRoute} onVerify={handlePasscodeVerify} />
 
       <ImagePreviewModal
         isOpen={!!previewImage}
@@ -380,9 +402,7 @@ const QChat = () => {
         <div className="min-h-screen flex items-center justify-center bg-background p-6">
           <div className="max-w-md text-center space-y-4">
             <h1 className="text-2xl font-bold">Invalid chat link</h1>
-            <p className="text-muted-foreground">
-              Missing conversation name or person name in the URL.
-            </p>
+            <p className="text-muted-foreground">Missing conversation name or person name in the URL.</p>
             <Button onClick={() => navigate("/")}>Go Home</Button>
           </div>
         </div>
@@ -392,18 +412,13 @@ const QChat = () => {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="min-h-screen bg-background flex flex-col overflow-x-hidden"
+              className="h-screen bg-background flex flex-col overflow-hidden"
             >
               {/* Header */}
               <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur-sm">
                 <div className="flex items-center justify-between px-3 sm:px-6 py-3">
                   <div className="flex items-center gap-2 sm:gap-4">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate("/")}
-                      className="shrink-0"
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="shrink-0">
                       <ArrowLeft className="w-5 h-5" />
                     </Button>
 
@@ -424,12 +439,7 @@ const QChat = () => {
                       <Mail className="w-4 h-4" />
                       Notify
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handlePushEmail}
-                      className="sm:hidden"
-                    >
+                    <Button variant="ghost" size="icon" onClick={handlePushEmail} className="sm:hidden">
                       <Mail className="w-4 h-4" />
                     </Button>
 
@@ -452,12 +462,7 @@ const QChat = () => {
                       )}
                     </Button>
 
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handlePause}
-                      className="sm:hidden"
-                    >
+                    <Button variant="ghost" size="icon" onClick={handlePause} className="sm:hidden">
                       {startPolling ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                     </Button>
 
@@ -482,7 +487,7 @@ const QChat = () => {
                 </div>
               </header>
 
-              {/* Messages Area */}
+              {/* Messages Area (only this scrolls) */}
               <ScrollArea ref={scrollAreaRef} className="flex-1 px-3 sm:px-6 overflow-x-hidden">
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-4">
@@ -495,7 +500,11 @@ const QChat = () => {
                     <p className="text-muted-foreground">Loading conversation...</p>
                   </div>
                 ) : (
-                  <div className="py-4 space-y-3">
+                  <div
+                    className="py-4 space-y-3"
+                    // KEY: padding equals actual input bar height (no extra gap, no hidden messages)
+                    style={{ paddingBottom: Math.max(0, inputBarHeight) }}
+                  >
                     {messages.map((message) => (
                       <ChatMessage
                         key={message.id}
@@ -508,18 +517,24 @@ const QChat = () => {
                       />
                     ))}
 
-                    {/* Scroll anchor */}
                     <div ref={bottomRef} />
                   </div>
                 )}
               </ScrollArea>
 
-              {/* Input Area (image ignored) */}
-              <ChatInput
-                value={inputValue}
-                onChange={setInputValue}
-                onSend={(content) => handleSendMessage(content)}
-              />
+              {/* Sticky Input Footer */}
+              <div
+                ref={inputBarRef}
+                className="sticky bottom-0 z-50 border-t bg-background/95 backdrop-blur-sm"
+              >
+                <div className="px-3 sm:px-6 py-3">
+                  <ChatInput
+                    value={inputValue}
+                    onChange={setInputValue}
+                    onSend={(content) => handleSendMessage(content)}
+                  />
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
