@@ -591,30 +591,26 @@ const QChatV3 = () => {
         {/* Input */}
         <footer className="shrink-0 border-t bg-background md:rounded-b-xl">
           <div className="p-3">
-            <div className="flex items-end">
-  <div className="relative flex-1">
-    <textarea
-      ref={textareaRef}
-      value={inputValue}
-      onChange={(e) => setInputValue(e.target.value)}
-      onKeyDown={handleKeyDown}
-      placeholder="Type a message..."
-      rows={1}
-      className="w-full min-h-[44px] max-h-[150px] pr-14 pl-4 py-3 rounded-2xl bg-muted/50 border-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-    />
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message..."
+                rows={1}
+                className="flex-1 min-h-[44px] max-h-[150px] px-4 py-3 rounded-2xl bg-muted/50 border-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
 
-    <Button
-      onClick={handleSend}
-      disabled={!inputValue.trim() || !headers}
-      size="icon"
-      className="absolute right-2 bottom-2 h-10 w-10 rounded-xl"
-      type="button"
-    >
-      <Send className="w-5 h-5" />
-    </Button>
-  </div>
-</div>
-
+              <Button
+                onClick={handleSend}
+                disabled={!inputValue.trim() || !headers}
+                className="h-[44px] w-[44px] shrink-0 rounded-xl"
+                size="icon"
+              >
+                <Send className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
         </footer>
       </div>
