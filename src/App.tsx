@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Anonymous from "./pages/anonymous/Anonymous";
 import QChat from "./pages/qchat/QChat";
 import QChats from "./pages/qchat/QChats";
+import QChatV3 from "./pages/qchat/QChatV3";
 import ReadAnonymous from "./pages/anonymous/ReadAnonymous";
 import TextBoxPage from "./pages/textbox/Index";
 import QChatOld from "./pages/qchat/QChatOld";
@@ -41,6 +42,7 @@ const App = () => (
 
           {/* Anonymous */}
           <Route path="/qchat/:conversationName/:personName" element={<QChat />} />
+          <Route path="/qc/:name/:sender" element={<QChatV3 />} />
           <Route path="/qchatold/:name/:sender" element={<QChatOld />} />
           <Route path="/qchats" element={<QChats />} />
           
