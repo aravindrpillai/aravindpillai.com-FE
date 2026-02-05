@@ -9,7 +9,6 @@ import Videos from "./pages/Videos";
 import Photos from "./pages/Photos";
 import NotFound from "./pages/NotFound";
 import Anonymous from "./pages/anonymous/Anonymous";
-import QChat from "./pages/qchat/QChat";
 import QChats from "./pages/qchat/QChats";
 import QChatV3 from "./pages/qchat/QChatV3";
 import ReadAnonymous from "./pages/anonymous/ReadAnonymous";
@@ -42,11 +41,11 @@ const App = () => (
 
 
           {/* Anonymous */}
-          <Route path="/qchat/:conversationName/:personName" element={<QChat />} />
-          <Route path="/qc/:name/:sender" element={<QChatV3 />} />
-         <Route path="/file/:name/:sender" element={<FileGallery />} />
+          <Route path="/qchat/:name/:sender" element={<QChatV3 />} />
           <Route path="/qchatold/:name/:sender" element={<QChatOld />} />
           <Route path="/qchats" element={<QChats />} />
+
+          <Route path="/file/:name/:sender" element={<FileGallery />} />
           
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
