@@ -274,7 +274,7 @@ const QChatV3 = () => {
 
   //Handle Message Reply
   const handleMessageReply = useCallback((msg: string) => {
-    setInputValue(msg+"\n----------------------------------- \n")
+    setInputValue(msg + "\n----------------------------------- \n")
 
     // Focus textarea + cursor at end
     requestAnimationFrame(() => {
@@ -490,10 +490,15 @@ const QChatV3 = () => {
 
               <div className="mt-3 space-y-3">
                 <input
-                  type="number"
                   ref={codeInputRef}
                   value={codeDraft}
-                  onChange={(e) => setCodeDraft(e.target.value)}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  onChange={(e) => {
+                    // Remove everything except digits
+                    const digitsOnly = e.target.value.replace(/\D/g, "");
+                    setCodeDraft(digitsOnly);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") confirmCode();
                     if (e.key === "Escape") navigate(-1);
@@ -501,6 +506,7 @@ const QChatV3 = () => {
                   placeholder="Code"
                   className="w-full h-11 px-3 rounded-xl bg-muted/40 border text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 />
+
 
                 <div className="flex gap-2 justify-end">
                   <Button variant="ghost" onClick={() => navigate(-1)}>
@@ -590,28 +596,28 @@ const QChatV3 = () => {
         <footer className="shrink-0 border-t bg-background md:rounded-b-xl">
           <div className="p-3">
             <div className="flex items-end">
-  <div className="relative flex-1">
-    <textarea
-      ref={textareaRef}
-      value={inputValue}
-      onChange={(e) => setInputValue(e.target.value)}
-      onKeyDown={handleKeyDown}
-      placeholder="Type a message..."
-      rows={1}
-      className="w-full min-h-[44px] max-h-[150px] pr-14 pl-4 py-3 rounded-2xl bg-muted/50 border-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-    />
+              <div className="relative flex-1">
+                <textarea
+                  ref={textareaRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type a message..."
+                  rows={1}
+                  className="w-full min-h-[44px] max-h-[150px] pr-14 pl-4 py-3 rounded-2xl bg-muted/50 border-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
 
-    <Button
-      onClick={handleSend}
-      disabled={!inputValue.trim() || !headers}
-      size="icon"
-      className="absolute right-2 bottom-2 h-10 w-10 rounded-xl"
-      type="button"
-    >
-      <Send className="w-5 h-5" />
-    </Button>
-  </div>
-</div>
+                <Button
+                  onClick={handleSend}
+                  disabled={!inputValue.trim() || !headers}
+                  size="icon"
+                  className="absolute right-2 bottom-2 h-10 w-10 rounded-xl"
+                  type="button"
+                >
+                  <Send className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
 
           </div>
         </footer>
@@ -641,8 +647,8 @@ const MessageBubble = ({ message, formatTime, onDelete, onReply }: MessageBubble
       <div className="relative max-w-[80%] sm:max-w-[70%]">
         <div
           className={`px-4 py-2.5 rounded-2xl ${isMe
-              ? "bg-primary text-primary-foreground rounded-br-md"
-              : "bg-muted text-foreground rounded-bl-md"
+            ? "bg-primary text-primary-foreground rounded-br-md"
+            : "bg-muted text-foreground rounded-bl-md"
             }`}
         >
           <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
