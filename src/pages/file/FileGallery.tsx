@@ -68,10 +68,10 @@
    };
  
    return (
-     <div className="h-dvh bg-muted/30 flex flex-col overflow-hidden">
-       <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full md:my-4 md:rounded-xl md:border md:shadow-lg bg-background overflow-hidden">
+    <div className="h-dvh bg-background flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col w-full bg-background overflow-hidden">
          {/* Fixed Header */}
-         <header className="shrink-0 border-b bg-background/95 backdrop-blur-sm z-40 md:rounded-t-xl">
+        <header className="shrink-0 border-b bg-background/95 backdrop-blur-sm z-40">
            <div className="flex items-center justify-between px-4 py-3">
              <h1 className="text-lg font-semibold text-foreground truncate">
                {formatName(name)}
