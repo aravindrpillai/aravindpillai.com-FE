@@ -133,10 +133,11 @@
    };
  
    return (
-     <div className="h-dvh bg-background flex flex-col overflow-hidden">
+     <div className="h-dvh bg-muted/30 flex flex-col overflow-hidden">
+       <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full md:my-4 md:rounded-xl md:border md:shadow-lg bg-background overflow-hidden">
        {/* Fixed Header */}
-       <header className="shrink-0 border-b bg-background/95 backdrop-blur-sm z-40">
-         <div className="flex items-center justify-between px-4 py-3">
+       <header className="shrink-0 border-b bg-background/95 backdrop-blur-sm z-40 md:rounded-t-xl">
+         <div className="flex items-center justify-between px-4 py-3 max-w-3xl mx-auto w-full">
            <h1 className="text-lg font-semibold text-foreground truncate">
              {formatName(name)}
            </h1>
@@ -159,8 +160,8 @@
        </header>
  
        {/* Scrollable Messages Area */}
-       <main className="flex-1 overflow-y-auto px-4 py-4">
-         <div className="space-y-3 max-w-3xl mx-auto">
+       <main className="flex-1 overflow-y-auto px-4 py-4 bg-background">
+         <div className="space-y-3">
            <AnimatePresence initial={false}>
              {messages.map((message) => (
                <MessageBubble key={message.id} message={message} formatTime={formatTime} />
@@ -171,8 +172,8 @@
        </main>
  
        {/* Fixed Input Area */}
-       <footer className="shrink-0 border-t bg-background">
-         <div className="p-3 max-w-3xl mx-auto">
+       <footer className="shrink-0 border-t bg-background md:rounded-b-xl">
+         <div className="p-3">
            <div className="flex items-end gap-2">
              <textarea
                ref={textareaRef}
@@ -194,6 +195,7 @@
            </div>
          </div>
        </footer>
+       </div>
      </div>
    );
  };
