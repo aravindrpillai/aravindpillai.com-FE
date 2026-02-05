@@ -208,13 +208,13 @@
          <Button
            variant="destructive"
            size="icon"
-          className="h-8 w-8"
+          className="h-[25%] w-[25%] min-h-6 min-w-6 max-h-10 max-w-10"
            onClick={(e) => {
              e.stopPropagation();
              onDelete();
            }}
          >
-           <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-3 h-3" />
          </Button>
        </div>
      </motion.div>
