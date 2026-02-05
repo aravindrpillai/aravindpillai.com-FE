@@ -485,14 +485,12 @@ const QChatV3 = () => {
               exit={{ scale: 0.98, opacity: 0, y: 8 }}
             >
               <div className="space-y-2">
-                <h2 className="text-base font-semibold">Enter conversation code</h2>
-                <p className="text-sm text-muted-foreground">
-                  This won’t be saved. Refreshing the page will ask again.
-                </p>
+                <h2 className="text-base font-semibold">Enter Code</h2>
               </div>
 
               <div className="mt-3 space-y-3">
                 <input
+                  type="number"
                   ref={codeInputRef}
                   value={codeDraft}
                   onChange={(e) => setCodeDraft(e.target.value)}
