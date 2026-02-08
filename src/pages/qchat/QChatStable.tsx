@@ -24,7 +24,7 @@ type ApiMsg = {
   time?: string; // backend time string
 };
 
-const QChatV3 = () => {
+const QChatStable = () => {
   const { name, sender } = useParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -771,4 +771,4 @@ const MessageBubble = ({ message, formatTime, onDelete, onReply }: MessageBubble
   );
 };
 
-export default QChatV3;
+export default QChatStable;
