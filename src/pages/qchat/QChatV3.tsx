@@ -44,6 +44,17 @@ const QChatV3 = () => {
   const [startPolling, setStartPolling] = useState(false);
   const lastIdRef = useRef(0);
 
+  // Polling control refs
+  const pollDelayRef = useRef<number>(1000); // current delay in ms
+  const noChangeCountRef = useRef<number>(0); // consecutive polls with no lastId change
+  const pollTimerRef = useRef<number | null>(null);
+  const pollTickRef = useRef<null | (() => void)>(null); // allow external "kick"
+
+  // Polling constants (single source of truth)
+  const FAST_POLLING_DELAY = 1000; // Polls in every 1 sec
+  const SLOW_POLLING_DELAY = 60000; // Polls in every 60 seconds
+  const CHANGE_TO_SOLW_POLLING_AFTER = 120; // After 120 fast polls, when there is no new msg, it changes to slow polling
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
@@ -165,8 +176,7 @@ const QChatV3 = () => {
       return apiMsgs.map((m) => {
         const isMe = m.sender === sender;
         const decrypted = decryptMessage(m.message);
-        const ts =
-          m.time && !Number.isNaN(Date.parse(m.time)) ? new Date(m.time) : new Date();
+        const ts = m.time && !Number.isNaN(Date.parse(m.time)) ? new Date(m.time) : new Date();
 
         return {
           id: String(m.id),
@@ -264,19 +274,24 @@ const QChatV3 = () => {
 
       setMessages([]);
       lastIdRef.current = 0;
+
+      // If you delete, treat as "activity" and go fast
+      pollDelayRef.current = FAST_POLLING_DELAY;
+      noChangeCountRef.current = 0;
+      if (pollTimerRef.current) window.clearTimeout(pollTimerRef.current);
+      pollTickRef.current?.();
     } catch (e) {
       console.error("Failed to delete messages:", e);
       alert("Failed to delete messages");
     } finally {
       setLoading(false);
     }
-  }, [headers]);
+  }, [headers, FAST_POLLING_DELAY]);
 
-  //Handle Message Reply
+  // Handle Message Reply
   const handleMessageReply = useCallback((msg: string) => {
-    setInputValue(msg + "\n----------------------------------- \n")
+    setInputValue(msg + "\n----------------------------------- \n");
 
-    // Focus textarea + cursor at end
     requestAnimationFrame(() => {
       const ta = textareaRef.current;
       if (!ta) return;
@@ -320,7 +335,6 @@ const QChatV3 = () => {
           return;
         }
 
-        // Update UI
         setMessages((prev) => prev.filter((m) => m.id !== id));
       } catch (e) {
         console.error("Failed to delete message:", e);
@@ -331,6 +345,17 @@ const QChatV3 = () => {
     },
     [headers]
   );
+
+  // Force polling back to FAST immediately (works even if currently in SLOW)
+  const kickPollingFast = useCallback(() => {
+    pollDelayRef.current = FAST_POLLING_DELAY;
+    noChangeCountRef.current = 0;
+
+    if (pollTimerRef.current) window.clearTimeout(pollTimerRef.current);
+
+    // Run a tick immediately; tick will schedule next using pollDelayRef.current
+    pollTickRef.current?.();
+  }, [FAST_POLLING_DELAY]);
 
   const handleSend = useCallback(async () => {
     if (!headers) {
@@ -375,6 +400,9 @@ const QChatV3 = () => {
         const uiMsg = apiToUi([apiMsg]);
         setMessages((prev) => mergeMessages(prev, uiMsg));
         lastIdRef.current = Math.max(lastIdRef.current, apiMsg.id);
+
+        // KEY FIX: if you're in slow mode, your own send forces FAST immediately
+        kickPollingFast();
       }
 
       setInputValue("");
@@ -385,32 +413,91 @@ const QChatV3 = () => {
     } finally {
       setLoading(false);
     }
-  }, [headers, inputValue, sender, code, apiToUi, mergeMessages]);
+  }, [headers, inputValue, sender, code, apiToUi, mergeMessages, kickPollingFast]);
 
   // ---------------------------
   // Polling
   // ---------------------------
   useEffect(() => {
-    if (!startPolling) return;
-    if (!headers) return;
+    if (!startPolling || !headers) return;
 
-    const interval = setInterval(async () => {
+    let cancelled = false;
+
+    const scheduleNext = (delay: number) => {
+      if (pollTimerRef.current) window.clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = window.setTimeout(tick, delay);
+    };
+
+    const tick = async () => {
+      if (cancelled) return;
+
+      const before = lastIdRef.current;
+
       try {
-        const apiMsgs = await getConversations(lastIdRef.current, false);
+        const apiMsgs = await getConversations(before, false);
+
         if (apiMsgs.length > 0) {
           const uiMsgs = apiToUi(apiMsgs);
           setMessages((prev) => mergeMessages(prev, uiMsgs));
+
           const maxId = Math.max(...apiMsgs.map((x) => x.id));
           lastIdRef.current = Math.max(lastIdRef.current, maxId);
+        }
+
+        const after = lastIdRef.current;
+
+        if (after !== before) {
+          // Activity -> go FAST and reset idle counter
+          pollDelayRef.current = FAST_POLLING_DELAY;
+          noChangeCountRef.current = 0;
+        } else {
+          // No change
+          noChangeCountRef.current += 1;
+
+          // Only switch to SLOW when currently FAST and idle for ~2 mins
+          if (
+            pollDelayRef.current === FAST_POLLING_DELAY &&
+            noChangeCountRef.current >= CHANGE_TO_SOLW_POLLING_AFTER
+          ) {
+            pollDelayRef.current = SLOW_POLLING_DELAY;
+            noChangeCountRef.current = 0;
+          }
         }
       } catch (e) {
         console.error("Polling failed:", e);
         setStartPolling(false);
+        return;
       }
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [startPolling, headers, getConversations, apiToUi, mergeMessages]);
+      scheduleNext(pollDelayRef.current);
+    };
+
+    // Expose tick so other code (like handleSend) can kick immediately
+    pollTickRef.current = () => {
+      tick();
+    };
+
+    // Start immediately (fast)
+    pollDelayRef.current = FAST_POLLING_DELAY;
+    noChangeCountRef.current = 0;
+    scheduleNext(pollDelayRef.current);
+
+    return () => {
+      cancelled = true;
+      pollTickRef.current = null;
+      if (pollTimerRef.current) window.clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    };
+  }, [
+    startPolling,
+    headers,
+    getConversations,
+    apiToUi,
+    mergeMessages,
+    FAST_POLLING_DELAY,
+    SLOW_POLLING_DELAY,
+    CHANGE_TO_SOLW_POLLING_AFTER,
+  ]);
 
   // When headers become available (code entered), do initial load + start polling
   useEffect(() => {
@@ -495,7 +582,6 @@ const QChatV3 = () => {
                   inputMode="numeric"
                   pattern="[0-9]*"
                   onChange={(e) => {
-                    // Remove everything except digits
                     const digitsOnly = e.target.value.replace(/\D/g, "");
                     setCodeDraft(digitsOnly);
                   }}
@@ -506,7 +592,6 @@ const QChatV3 = () => {
                   placeholder="Code"
                   className="w-full h-11 px-3 rounded-xl bg-muted/40 border text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 />
-
 
                 <div className="flex gap-2 justify-end">
                   <Button variant="ghost" onClick={() => navigate(-1)}>
@@ -526,9 +611,7 @@ const QChatV3 = () => {
         {/* Header */}
         <header className="shrink-0 border-b bg-background/95 backdrop-blur-sm z-40 md:rounded-t-xl">
           <div className="flex items-center justify-between px-4 py-3 max-w-3xl mx-auto w-full">
-            <h1 className="text-lg font-semibold text-foreground truncate">
-              {formatName(name)}
-            </h1>
+            <h1 className="text-lg font-semibold text-foreground truncate">{formatName(name)}</h1>
 
             <div className="flex items-center gap-1">
               <Button
@@ -542,6 +625,7 @@ const QChatV3 = () => {
                 <Bell className="w-4 h-4" />
               </Button>
 
+              <a>Interval : {pollTimerRef.current}</a>
               <Button
                 variant="ghost"
                 size="icon"
@@ -550,11 +634,7 @@ const QChatV3 = () => {
                 disabled={!headers}
                 title={startPolling ? "Pause" : "Resume"}
               >
-                {startPolling ? (
-                  <Pause className="w-4 h-4" />
-                ) : (
-                  <Play className="w-4 h-4" />
-                )}
+                {startPolling ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </Button>
 
               <Button
@@ -618,7 +698,6 @@ const QChatV3 = () => {
                 </Button>
               </div>
             </div>
-
           </div>
         </footer>
       </div>
@@ -646,9 +725,7 @@ const MessageBubble = ({ message, formatTime, onDelete, onReply }: MessageBubble
     >
       <div className="relative max-w-[80%] sm:max-w-[70%]">
         <div
-          className={`px-4 py-2.5 rounded-2xl ${isMe
-            ? "bg-primary text-primary-foreground rounded-br-md"
-            : "bg-muted text-foreground rounded-bl-md"
+          className={`px-4 py-2.5 rounded-2xl ${isMe ? "bg-primary text-primary-foreground rounded-br-md" : "bg-muted text-foreground rounded-bl-md"
             }`}
         >
           <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
@@ -666,19 +743,29 @@ const MessageBubble = ({ message, formatTime, onDelete, onReply }: MessageBubble
           className={`absolute top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMe ? "-left-16" : "-right-16"
             }`}
         >
-          <Button variant="ghost" size="icon" className="h-7 w-7" type="button" onClick={() => { onReply(message.content) }} >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            type="button"
+            onClick={() => {
+              onReply(message.content);
+            }}
+          >
             <Reply className="w-3.5 h-3.5" />
           </Button>
 
-          {isMe && <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={() => onDelete(message.id)}
-            type="button"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>}
+          {isMe && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={() => onDelete(message.id)}
+              type="button"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
         </div>
       </div>
     </motion.div>

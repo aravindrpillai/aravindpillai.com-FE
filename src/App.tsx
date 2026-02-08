@@ -13,7 +13,6 @@ import QChats from "./pages/qchat/QChats";
 import QChatV3 from "./pages/qchat/QChatV3";
 import ReadAnonymous from "./pages/anonymous/ReadAnonymous";
 import TextBoxPage from "./pages/textbox/Index";
-import QChatOld from "./pages/qchat/QChatOld";
  import FileGallery from "./pages/file/FileGallery";
 
 const queryClient = new QueryClient();
@@ -42,7 +41,6 @@ const App = () => (
 
           {/* Anonymous */}
           <Route path="/qchat/:name/:sender" element={<QChatV3 />} />
-          <Route path="/qchatold/:name/:sender" element={<QChatOld />} />
           <Route path="/qchats" element={<QChats />} />
 
           <Route path="/file/:name/:sender" element={<FileGallery />} />
