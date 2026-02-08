@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Anonymous from "./pages/anonymous/Anonymous";
 import QChats from "./pages/qchat/QChats";
 import QChatV3 from "./pages/qchat/QChatV3";
+import QChatStable from "./pages/qchat/QChatStable";
 import ReadAnonymous from "./pages/anonymous/ReadAnonymous";
 import TextBoxPage from "./pages/textbox/Index";
  import FileGallery from "./pages/file/FileGallery";
@@ -41,6 +42,8 @@ const App = () => (
 
           {/* Anonymous */}
           <Route path="/qchat/:name/:sender" element={<QChatV3 />} />
+          <Route path="/qchatstable/:name/:sender" element={<QChatStable />} />
+          
           <Route path="/qchats" element={<QChats />} />
 
           <Route path="/file/:name/:sender" element={<FileGallery />} />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Pause, Play, Trash2, Send, Paperclip, Reply, Loader2 } from "lucide-react";
+import { Bell, Pause, Play, Trash2, Send, Reply, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ApiClient from "@/lib/api";
@@ -66,7 +66,6 @@ const QChatV3 = () => {
       textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
     }
   }, []);
-
 
   useEffect(() => {
     adjustTextareaHeight();
@@ -542,8 +541,7 @@ const QChatV3 = () => {
   const togglePolling = () => setStartPolling((p) => !p);
 
   return (
-    <div className="h-dvh w-screen bg-muted/30 flex flex-col overflow-x-hidden overflow-y-hidden">
-
+    <div className="h-dvh bg-muted/30 flex flex-col overflow-hidden">
       {/* Loading overlay */}
       <AnimatePresence>
         {loading && (
@@ -609,7 +607,7 @@ const QChatV3 = () => {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col min-w-0 max-w-3xl mx-auto w-full md:my-4 md:rounded-xl md:border md:shadow-lg bg-background overflow-hidden">
+      <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full md:my-4 md:rounded-xl md:border md:shadow-lg bg-background overflow-hidden">
         {/* Header */}
         <header className="shrink-0 border-b bg-background/95 backdrop-blur-sm z-40 md:rounded-t-xl">
           <div className="flex items-center justify-between px-4 py-3 max-w-3xl mx-auto w-full">
@@ -656,9 +654,8 @@ const QChatV3 = () => {
         <main
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden px-4 py-4 bg-background"
+          className="flex-1 overflow-y-auto px-4 py-4 bg-background"
         >
-
           <div className="space-y-3">
             <AnimatePresence initial={false}>
               {messages.map((message) => (
@@ -678,7 +675,6 @@ const QChatV3 = () => {
         <footer className="shrink-0 border-t bg-background md:rounded-b-xl">
           <div className="p-3">
             <div className="flex items-end">
-
               <div className="relative flex-1">
                 <textarea
                   ref={textareaRef}
@@ -687,34 +683,19 @@ const QChatV3 = () => {
                   onKeyDown={handleKeyDown}
                   placeholder="Type a message..."
                   rows={1}
-                  className="w-full min-h-[44px] max-h-[150px]
-               pl-14 pr-14 py-3
-               rounded-2xl bg-muted/50 border-0 resize-none
-               text-sm leading-relaxed placeholder:text-muted-foreground
-               focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full min-h-[44px] max-h-[150px] pr-14 pl-4 py-3 rounded-2xl bg-muted/50 border-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
-
-                {/* <Button
-                  onClick={()=>{}}
-                  size="icon"
-                  type="button"
-                  className="absolute left-2 bottom-2 h-10 w-10 rounded-xl"
-                >
-                  <Paperclip className="w-5 h-5" />
-                </Button> */}
 
                 <Button
                   onClick={handleSend}
                   disabled={!inputValue.trim() || !headers}
                   size="icon"
-                  type="button"
                   className="absolute right-2 bottom-2 h-10 w-10 rounded-xl"
+                  type="button"
                 >
                   <Send className="w-5 h-5" />
                 </Button>
               </div>
-
-
             </div>
           </div>
         </footer>
@@ -734,46 +715,6 @@ interface MessageBubbleProps {
 const MessageBubble = ({ message, formatTime, onDelete, onReply }: MessageBubbleProps) => {
   const isMe = message.sender === "me";
 
-
-  const LINK_RE = /((https?:\/\/)|(www\.))[^\s<>"')\]]+/gi;
-
-  function linkify(text: string) {
-    const out: React.ReactNode[] = [];
-    let last = 0;
-
-    text.replace(LINK_RE, (...args) => {
-      const match = args[0] as string;
-      const offset = args[args.length - 2] as number;
-
-      // keep everything before the link EXACTLY as-is
-      if (offset > last) out.push(text.slice(last, offset));
-
-      const href = match.startsWith("www.") ? `https://${match}` : match;
-
-      out.push(
-        <a
-          key={`${offset}-${match}`}
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 break-all"
-        >
-          {match}
-        </a>
-      );
-
-      last = offset + match.length;
-      return match;
-    });
-
-    // keep everything after the last link EXACTLY as-is
-    if (last < text.length) out.push(text.slice(last));
-
-    return out;
-  }
-
-
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -786,7 +727,7 @@ const MessageBubble = ({ message, formatTime, onDelete, onReply }: MessageBubble
           className={`px-4 py-2.5 rounded-2xl ${isMe ? "bg-primary text-primary-foreground rounded-br-md" : "bg-muted text-foreground rounded-bl-md"
             }`}
         >
-          <p className="text-sm whitespace-pre-wrap break-words">{linkify(message.content)}</p>
+          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
 
           <span
             className={`text-[10px] mt-1 block ${isMe ? "text-primary-foreground/70" : "text-muted-foreground"
