@@ -1,12 +1,88 @@
+
+
+#Step 1 — Install Nginx + Certbot
+> sudo apt update
+> sudo apt install -y nginx
+> sudo systemctl enable nginx
+> sudo systemctl start nginx
+> sudo apt install -y certbot python3-certbot-nginx
+
+#Install App softwares
 curl -sL https://deb.nodesource.com/setup_current.x | sudo -E bash -    # Download Node
 sudo apt-get install nodejs -y                                          # Install Node
 apt install git                                                        # Instal git
 
+#clone the code
 git clone https://github.com/aravindrpillai/aravind-frontend-lovable.git   # Checkout code
 
-npm i                                                                   # do this inside the code's root folder
 
-npm install pm2@latest -g                                               # install "PM2" to handle the service 
-pm2 start npm --name "ui-app" -- run dev
-pm2 list                                                                # To show all services
-pm2 stop "ui-app"                                                       # To close the app
+# Build the app
+> cd /root/aravind-frontend-lovable
+> npm ci
+> npm run build
+
+# Make a proper web root
+> sudo mkdir -p /var/www/aravindpillai.com
+
+# Copy your built files inside (/root/aravind-frontend-lovable/dist) into it
+> sudo rm -rf /var/www/aravindpillai.com/*
+> sudo cp -r /root/aravind-frontend-lovable/dist/* /var/www/aravindpillai.com/
+
+# Then edit the config file
+> sudo nano /etc/nginx/sites-available/aravindpillai.com
+
+# Paste the below (ignore the line)
+------------------------------------------
+server {
+    listen 80;
+    server_name aravindpillai.com www.aravindpillai.com;
+
+    root /var/www/aravindpillai.com;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+------------------------------------------
+
+
+# Enable Nginx + Reload:
+> sudo ln -s /etc/nginx/sites-available/aravindpillai.com /etc/nginx/sites-enabled/
+> sudo rm -f /etc/nginx/sites-enabled/default
+> sudo nginx -t
+> sudo systemctl reload nginx
+
+# Test HTTP
+> curl -I http://aravindpillai.com
+
+
+# After HTTP works: enable HTTPS
+> sudo apt install -y certbot python3-certbot-nginx
+> sudo certbot --nginx -d aravindpillai.com -d www.aravindpillai.com
+
+# Make sure the firewalls are open for 80 and 443.
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw reload
+
+# Test Https:
+> curl -I https://aravindpillai.com
+
+
+
+=================================================================================
+
+#When a new change is pushed :
+> git reset --hard
+> git clean -fd
+> git pull
+
+> npm ci
+> npm run build
+> sudo rm -rf /var/www/aravindpillai.com/*
+> sudo cp -r dist/* /var/www/aravindpillai.com/
+> sudo chown -R www-data:www-data /var/www/aravindpillai.com
+> sudo systemctl reload nginx
+> curl -I https://aravindpillai.com
