@@ -625,7 +625,6 @@ const QChatV3 = () => {
                 <Bell className="w-4 h-4" />
               </Button>
 
-              <a>Interval : {pollTimerRef.current}</a>
               <Button
                 variant="ghost"
                 size="icon"
