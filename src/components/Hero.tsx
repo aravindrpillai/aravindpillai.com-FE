@@ -3,6 +3,7 @@ import { BookOpen, Video, Camera } from "lucide-react";
 import { Link } from "react-router-dom";
 import SocialLinks from "./SocialLinks";
 import profileImage from "@/assets/profile.png";
+import heroBg from "@/assets/hero-bg.jpg";
 
 const taglineItems = [
   "Fullstack Developer",
