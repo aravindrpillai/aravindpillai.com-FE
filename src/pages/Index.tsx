@@ -3,6 +3,7 @@ import About from "@/components/About";
 import AISection from "@/components/AISection";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 
 const Index = () => {
   return (
@@ -12,6 +13,7 @@ const Index = () => {
       <AISection />
       <Contact />
       <Footer />
+      <ThemeSwitcher />
     </main>
   );
 };
