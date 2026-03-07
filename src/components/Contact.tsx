@@ -28,15 +28,18 @@ const Contact = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
         >
-          <h2 className="text-3xl md:text-5xl font-display font-bold mb-4 text-center">
-            Get in <span className="text-gradient">Touch</span>
-          </h2>
-          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+          <div className="flex items-center gap-4 mb-4 justify-center">
+            <div className="h-px flex-1 max-w-[80px] bg-gradient-to-r from-transparent to-primary/30" />
+            <h2 className="text-3xl md:text-5xl font-display font-light text-center">
+              Get in <span className="text-gradient font-semibold">Touch</span>
+            </h2>
+            <div className="h-px flex-1 max-w-[80px] bg-gradient-to-l from-transparent to-primary/30" />
+          </div>
+          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto font-light">
             Have a question or want to work together? Drop me a message!
           </p>
 
           <div className="grid md:grid-cols-2 gap-12">
-            {/* Contact Info */}
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -51,10 +54,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-display font-semibold text-lg">Email</h3>
-                    <a
-                      href="mailto:hello@aravindpillai.com"
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                    >
+                    <a href="mailto:hello@aravindpillai.com" className="text-muted-foreground hover:text-primary transition-colors text-sm">
                       hello@aravindpillai.com
                     </a>
                   </div>
@@ -68,10 +68,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-display font-semibold text-lg">Phone</h3>
-                    <a
-                      href="tel:+1 (416) 854-7092"
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                    >
+                    <a href="tel:+1 (416) 854-7092" className="text-muted-foreground hover:text-primary transition-colors text-sm">
                       +1 (416) 854-7092
                     </a>
                   </div>
@@ -79,7 +76,7 @@ const Contact = () => {
               </div>
 
               <div className="p-6 bg-card rounded-2xl border border-border shadow-soft text-center">
-                <p className="text-muted-foreground text-sm">
+                <p className="text-muted-foreground text-sm font-light">
                   Based in <span className="text-foreground font-medium">Canada</span> 🇨🇦
                   <br />
                   Originally from <span className="text-foreground font-medium">Kerala, India</span> 🇮🇳
@@ -87,7 +84,6 @@ const Contact = () => {
               </div>
             </motion.div>
 
-            {/* Contact Form */}
             <motion.form
               onSubmit={handleSubmit}
               initial={{ opacity: 0, x: 30 }}
@@ -96,38 +92,32 @@ const Contact = () => {
               transition={{ delay: 0.3, duration: 0.6 }}
               className="space-y-6"
             >
-              <div>
-                <Input
-                  placeholder="Your Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  className="h-12 bg-card border-border focus:border-primary"
-                />
-              </div>
-              <div>
-                <Input
-                  type="email"
-                  placeholder="Your Email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  className="h-12 bg-card border-border focus:border-primary"
-                />
-              </div>
-              <div>
-                <Textarea
-                  placeholder="Your Message"
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  required
-                  rows={5}
-                  className="bg-card border-border focus:border-primary resize-none"
-                />
-              </div>
+              <Input
+                placeholder="Your Name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                className="h-12 bg-card border-border focus:border-primary"
+              />
+              <Input
+                type="email"
+                placeholder="Your Email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                className="h-12 bg-card border-border focus:border-primary"
+              />
+              <Textarea
+                placeholder="Your Message"
+                value={formData.message}
+                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                required
+                rows={5}
+                className="bg-card border-border focus:border-primary resize-none"
+              />
               <Button
                 type="submit"
-                className="w-full h-12 bg-gradient-warm hover:opacity-90 transition-opacity text-primary-foreground font-medium"
+                className="w-full h-12 bg-gradient-warm hover:opacity-90 transition-opacity text-primary-foreground font-medium tracking-wide"
               >
                 <Send size={18} className="mr-2" />
                 Send Message
