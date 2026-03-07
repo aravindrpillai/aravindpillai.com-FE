@@ -21,8 +21,7 @@ const AISection = () => {
           </motion.div>
 
           <h2 className="text-3xl md:text-5xl font-display font-bold mb-6">
-            So I Poked the{" "}
-            <span className="text-gradient">AI Bear</span> 🐻
+            So I Poked the <span className="text-gradient">AI Bear</span> 🐻
           </h2>
 
           <div className="space-y-4 text-lg text-muted-foreground font-body max-w-2xl mx-auto mb-10">
@@ -32,19 +31,8 @@ const AISection = () => {
               viewport={{ once: true }}
               transition={{ delay: 0.2, duration: 0.6 }}
             >
-              Turns out, telling a machine to "be smart" is harder than it sounds. 
-              But hey, I gave it a shot anyway — because why let a lack of expertise 
-              stop anyone in 2025, right?
-            </motion.p>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3, duration: 0.6 }}
-              className="text-foreground/70 italic"
-            >
-              Fair warning: the robots haven't taken over yet… but I'm working on it. 🤖
+              Teaching a machine to be smart isn’t that hard. Convincing humans they’re not already smart is the real
+              problem.
             </motion.p>
           </div>
 
