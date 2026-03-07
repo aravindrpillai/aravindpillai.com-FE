@@ -31,8 +31,7 @@ const AISection = () => {
               viewport={{ once: true }}
               transition={{ delay: 0.2, duration: 0.6 }}
             >
-              Teaching a machine to be smart isn’t that hard. Convincing humans they’re not already smart is the real
-              problem.
+              Teaching a machine to be smart isn’t that hard, convincing humans they’re not is the real challenge
             </motion.p>
           </div>
 
