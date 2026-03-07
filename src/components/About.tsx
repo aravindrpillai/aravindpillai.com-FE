@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ExternalLink, TrendingUp, BarChart3 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import InstaLink from "./PhotgraphyLink";
 import SocialLinks from "./SocialLinks";
 
@@ -13,17 +13,21 @@ const About = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
         >
-          <h2 className="text-3xl md:text-5xl font-display font-bold mb-12 text-center">
-            About <span className="text-gradient">Me</span>
-          </h2>
+          <div className="flex items-center gap-4 mb-12 justify-center">
+            <div className="h-px flex-1 max-w-[80px] bg-gradient-to-r from-transparent to-primary/30" />
+            <h2 className="text-3xl md:text-5xl font-display font-light text-center">
+              About <span className="text-gradient font-semibold">Me</span>
+            </h2>
+            <div className="h-px flex-1 max-w-[80px] bg-gradient-to-l from-transparent to-primary/30" />
+          </div>
 
-          <div className="space-y-6 text-lg leading-relaxed text-foreground/90 font-body text-justify">
+          <div className="space-y-6 text-base md:text-lg leading-relaxed text-foreground/80 font-body font-light text-justify">
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1, duration: 0.6 }}
-              className="first-letter:text-5xl first-letter:font-display first-letter:text-primary first-letter:mr-2 first-letter:float-left first-letter:leading-none"
+              className="first-letter:text-5xl first-letter:font-display first-letter:text-primary first-letter:mr-2 first-letter:float-left first-letter:leading-none first-letter:font-semibold"
             >
               Hello there, I'm a full-stack developer with a love for exploring the world and capturing its beauty through my lens. My obsession with coding is like a never-ending romance that just keeps getting stronger with each new technology I learn.
             </motion.p>
@@ -75,11 +79,9 @@ const About = () => {
                 <SocialLinks size="lg" />
               </motion.div>
             </motion.p>
-
-
           </div>
 
-          {/* Anonymous Message & Stock Analyzer Links */}
+          {/* Anonymous Message Link */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -87,7 +89,7 @@ const About = () => {
             transition={{ delay: 0.6, duration: 0.6 }}
             className="mt-12 p-6 bg-card rounded-2xl border border-border shadow-soft"
           >
-            <p className="text-foreground/90 mb-4 text-justify">
+            <p className="text-foreground/80 mb-4 text-justify font-light">
               And finally, if you've ever felt the urge to share something with me without the fuss of revealing your true identity, look no further:
             </p>
             <a
@@ -97,30 +99,6 @@ const About = () => {
               <ExternalLink size={18} />
               Send an anonymous message
             </a>
-
-            {/* <div className="mt-6 pt-6 border-t border-border">
-              <p className="text-foreground/90 mb-4">
-                Interested in the stock market? Check out my prediction analyzer:
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <a
-                  href="#"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors font-medium"
-                >
-                  <TrendingUp size={18} />
-                  LongTerm
-                </a>
-                <a
-                  href="#"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors font-medium"
-                >
-                  <BarChart3 size={18} />
-                  Intraday
-                </a>
-              </div>
-            </div> */}
-
-            
           </motion.div>
         </motion.div>
       </div>
