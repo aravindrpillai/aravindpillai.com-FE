@@ -1,4 +1,4 @@
-import { Github, Facebook, Instagram, Linkedin, MessageCircle } from "lucide-react";
+import { Github, Facebook, Instagram, Linkedin, MessageCircle, Mail, Phone, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
 const socialLinks = [
@@ -18,13 +18,13 @@ const SocialLinks = ({ size = "md", className = "" }: SocialLinksProps) => {
   const sizeClasses = {
     sm: "w-9 h-9",
     md: "w-11 h-11",
-    lg: "w-12 h-12",
+    lg: "w-14 h-14",
   };
 
   const iconSizes = {
     sm: 16,
-    md: 18,
-    lg: 20,
+    md: 20,
+    lg: 24,
   };
 
   return (
@@ -35,11 +35,11 @@ const SocialLinks = ({ size = "md", className = "" }: SocialLinksProps) => {
           href={social.href}
           target="_blank"
           rel="noopener noreferrer"
-          className={`${sizeClasses[size]} flex items-center justify-center rounded-full border border-border/50 text-muted-foreground hover:text-primary hover:border-primary/50 transition-all duration-300`}
+          className={`${sizeClasses[size]} flex items-center justify-center rounded-full bg-card border border-border hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 shadow-soft hover:shadow-glow`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 * index, duration: 0.5 }}
-          whileHover={{ scale: 1.1, y: -2 }}
+          whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           aria-label={social.label}
         >

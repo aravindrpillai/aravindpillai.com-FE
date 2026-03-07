@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -16,43 +16,74 @@
 
 @layer base {
   :root {
-    --background: 222 30% 8%;
-    --foreground: 40 15% 92%;
+    --background: 30 20% 98%;
+    --foreground: 220 20% 15%;
 
-    --card: 222 25% 11%;
-    --card-foreground: 40 15% 92%;
+    --card: 30 15% 96%;
+    --card-foreground: 220 20% 15%;
 
-    --popover: 222 28% 10%;
-    --popover-foreground: 40 15% 92%;
+    --popover: 30 20% 98%;
+    --popover-foreground: 220 20% 15%;
 
-    --primary: 42 75% 55%;
-    --primary-foreground: 222 30% 8%;
+    --primary: 24 80% 55%;
+    --primary-foreground: 30 20% 98%;
 
-    --secondary: 222 18% 16%;
-    --secondary-foreground: 40 10% 80%;
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 20% 25%;
 
-    --muted: 222 15% 14%;
-    --muted-foreground: 220 10% 50%;
+    --muted: 30 10% 94%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 42 65% 48%;
-    --accent-foreground: 222 30% 8%;
+    --accent: 24 75% 50%;
+    --accent-foreground: 30 20% 98%;
 
-    --destructive: 0 62.8% 50%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 222 15% 18%;
-    --input: 222 15% 18%;
-    --ring: 42 75% 55%;
+    --border: 30 15% 88%;
+    --input: 30 15% 88%;
+    --ring: 24 80% 55%;
 
     --radius: 0.75rem;
 
-    --gradient-warm: linear-gradient(135deg, hsl(42, 75%, 55%) 0%, hsl(28, 70%, 50%) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(222, 30%, 8%) 0%, hsl(222, 25%, 6%) 100%);
-    --shadow-soft: 0 4px 20px -4px hsl(0, 0%, 0%, 0.3);
-    --shadow-glow: 0 8px 40px -8px hsl(42, 75%, 55%, 0.2);
+    /* Custom tokens */
+    --gradient-warm: linear-gradient(135deg, hsl(24, 80%, 55%) 0%, hsl(350, 70%, 60%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(30, 20%, 98%) 0%, hsl(30, 15%, 95%) 100%);
+    --shadow-soft: 0 4px 20px -4px hsl(220, 20%, 15%, 0.08);
+    --shadow-glow: 0 8px 40px -8px hsl(24, 80%, 55%, 0.25);
 
-    --font-display: 'Cormorant Garamond', serif;
-    --font-body: 'Outfit', sans-serif;
+    --font-display: 'Playfair Display', serif;
+    --font-body: 'Inter', sans-serif;
+  }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 30 15% 95%;
+
+    --card: 220 18% 14%;
+    --card-foreground: 30 15% 95%;
+
+    --popover: 220 20% 10%;
+    --popover-foreground: 30 15% 95%;
+
+    --primary: 24 80% 60%;
+    --primary-foreground: 220 20% 10%;
+
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 30 15% 90%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 30 10% 60%;
+
+    --accent: 24 75% 55%;
+    --accent-foreground: 220 20% 10%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 24 80% 60%;
   }
 }
 
@@ -109,18 +140,32 @@
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 html, body {
