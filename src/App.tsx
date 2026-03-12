@@ -15,6 +15,8 @@ import QChatStable from "./pages/qchat/QChatStable";
 import ReadAnonymous from "./pages/anonymous/ReadAnonymous";
 import TextBoxPage from "./pages/textbox/Index";
  import FileGallery from "./pages/file/FileGallery";
+import CAA from "./pages/CAA";
+import Beneva from "./pages/Beneva";
 
 const queryClient = new QueryClient();
 
