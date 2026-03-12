@@ -41,7 +41,7 @@ const Beneva = () => {
       </footer>
 
 
-      {/* GFT AI : import:  <script src="/claimplugin.js"></script> */}
+      {/* GFT AI : import:  <script src="https://ai.aravindpillai.com/claimplugin.js"></script> */}
       <button
         className="fixed bottom-6 right-6 bg-[#003DA5] hover:bg-[#002d7a] text-white rounded-full h-14 w-14 flex items-center justify-center shadow-lg transition-colors"
         onClick={() => {window.MyWidget.initiateHandler({ company: "beneva", email: "john@gmail.com", name:"John Philip", policynumber : "BEN999888", mobile:"9990009283" }) }}
