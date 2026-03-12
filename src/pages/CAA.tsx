@@ -33,18 +33,22 @@ const CAA = () => {
         ))}
       </section>
 
+      <center><div id="claim-ai-popup"></div></center>
+
       {/* Footer */}
       <footer className="bg-gray-100 text-gray-500 text-center py-6 text-sm">
         © 2026 CAA. All rights reserved.
       </footer>
 
-      {/* Chat Button */}
+      {/* GFT AI : import:  <script src="/claimplugin.js"></script> */}
       <button
         className="fixed bottom-6 right-6 bg-[#003DA5] hover:bg-[#002d7a] text-white rounded-full h-14 w-14 flex items-center justify-center shadow-lg transition-colors"
-        onClick={() => {}}
+        onClick={() => {window.MyWidget.initiateHandler({ company: "caa", email: "david@gmail.com", name:"David Ben", policynumber : "CAA123456", mobile:"8880006565" }) }}
       >
-        <MessageCircle className="w-6 h-6" />
+        Claim
       </button>
+
+
     </div>
   );
 };

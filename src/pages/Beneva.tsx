@@ -33,18 +33,23 @@ const Beneva = () => {
         ))}
       </section>
 
+      <center><div id="claim-ai-popup"></div></center>
+
       {/* Footer */}
       <footer className="bg-gray-100 text-gray-500 text-center py-6 text-sm">
         © 2026 Beneva. All rights reserved.
       </footer>
 
-      {/* Chat Button */}
+
+      {/* GFT AI : import:  <script src="/claimplugin.js"></script> */}
       <button
-        className="fixed bottom-6 right-6 bg-[#00B140] hover:bg-[#009532] text-white rounded-full h-14 w-14 flex items-center justify-center shadow-lg transition-colors"
-        onClick={() => {}}
+        className="fixed bottom-6 right-6 bg-[#003DA5] hover:bg-[#002d7a] text-white rounded-full h-14 w-14 flex items-center justify-center shadow-lg transition-colors"
+        onClick={() => {window.MyWidget.initiateHandler({ company: "beneva", email: "john@gmail.com", name:"John Philip", policynumber : "BEN999888", mobile:"9990009283" }) }}
       >
-        <MessageCircle className="w-6 h-6" />
+        Claim
       </button>
+
+
     </div>
   );
 };
