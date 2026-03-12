@@ -49,7 +49,9 @@ const App = () => (
           <Route path="/qchats" element={<QChats />} />
 
           <Route path="/file/:name/:sender" element={<FileGallery />} />
-          
+          <Route path="/caa" element={<CAA />} />
+          <Route path="/beneva" element={<Beneva />} />
+
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
