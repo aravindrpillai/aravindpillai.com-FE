@@ -28,11 +28,19 @@ const PIN_RE = /^[0-9]{4}$/; // chat password: exactly 4 digits
 const NAME_RE = /^[a-z0-9_-]{1,10}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_NOTIFY_SUBJECT = "Grab your free coupons before they run out";
+const DEFAULT_NOTIFY_INTERVAL = 30; // minutes between two notifies by the same user; 0 = no limit
+const MAX_NOTIFY_INTERVAL = 7 * 24 * 60;
+const intervalError = (v: string) => {
+  if (!/^[0-9]+$/.test(v.trim())) return "Notify interval must be a whole number of minutes";
+  const n = Number(v);
+  return n > MAX_NOTIFY_INTERVAL ? `Notify interval must be between 0 and ${MAX_NOTIFY_INTERVAL} minutes` : null;
+};
 const IDLE_LOCK_MS = 15 * 60 * 1000;
 
 interface AdminChat {
   name: string;
   notify_subject: string;
+  notify_interval: number; // minutes; 0 = no limit
   locked: boolean;
   incorrect_pw_count: number;
   message_count: number;
@@ -238,11 +246,11 @@ const QChatRegister = () => {
               busy={busy}
               existing={chats.map((c) => c.name)}
               onCancel={() => setMode("view")}
-              onCreate={async (name, code, users, notify_subject) => {
+              onCreate={async (name, code, users, notify_subject, notify_interval) => {
                 setBusy(true);
                 try {
                   const { token } = await deriveKeys(code, name);
-                  const r = await api<AdminChat>("POST", "", { name, token, users, notify_subject });
+                  const r = await api<AdminChat>("POST", "", { name, token, users, notify_subject, notify_interval });
                   if (r.ok) {
                     replaceChat(r.data);
                     setSelected(name);
@@ -327,13 +335,14 @@ const NewChatForm = ({
   busy: boolean;
   existing: string[];
   onCancel: () => void;
-  onCreate: (name: string, code: string, users: NewUser[], notifySubject: string) => void;
+  onCreate: (name: string, code: string, users: NewUser[], notifySubject: string, notifyInterval: number) => void;
 }) => {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [confirm, setConfirm] = useState("");
   const [rows, setRows] = useState<{ username: string; email: string }[]>([{ username: "", email: "" }]);
   const [subject, setSubject] = useState("");
+  const [interval, setInterval_] = useState(String(DEFAULT_NOTIFY_INTERVAL));
 
   const setRow = (i: number, patch: Partial<{ username: string; email: string }>) =>
     setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -355,7 +364,9 @@ const NewChatForm = ({
       users.push(e ? { username: u, email: e } : { username: u });
     }
     if (users.length === 0) return toast.error("Register at least one user");
-    onCreate(n, code, users, subject.trim());
+    const ivErr = intervalError(interval);
+    if (ivErr) return toast.error(ivErr);
+    onCreate(n, code, users, subject.trim(), Number(interval));
   };
 
   return (
@@ -412,6 +423,16 @@ const NewChatForm = ({
         <Label>Notify email subject (optional)</Label>
         <Input placeholder={DEFAULT_NOTIFY_SUBJECT} maxLength={200} value={subject} onChange={(e) => setSubject(e.target.value)} />
       </div>
+      <div className="space-y-2">
+        <Label>Notify interval (minutes)</Label>
+        <Input
+          type="number" inputMode="numeric" min={0} max={MAX_NOTIFY_INTERVAL} className="w-32"
+          value={interval} onChange={(e) => setInterval_(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          How long a user must wait before pressing the bell again. 0 = no limit.
+        </p>
+      </div>
       <div className="flex gap-3 pt-2">
         <Button className="flex-1" onClick={submit} disabled={busy}>
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create chat"}
@@ -445,6 +466,7 @@ const ChatDetail = ({
   const [editing, setEditing] = useState<string | null>(null); // username whose email is being edited
   const [emailDraft, setEmailDraft] = useState("");
   const [subject, setSubject] = useState(chat.notify_subject);
+  const [interval, setInterval_] = useState(String(chat.notify_interval ?? DEFAULT_NOTIFY_INTERVAL));
   const base = encodeURIComponent(chat.name) + "/";
 
   const run = async <T,>(fn: () => Promise<ApiResult<T>>, success: string) => {
@@ -537,7 +559,7 @@ const ChatDetail = ({
           <Badge variant="outline">{chat.incorrect_pw_count} failed logins</Badge>
         ) : null}
         <div className="flex-1" />
-        {(chat.locked || chat.incorrect_pw_count > 0) && (
+        {chat.locked && (
           <Button
             variant="outline" size="sm" className="gap-2" disabled={busy}
             onClick={() => run(() => api("PUT", "", { name: chat.name, unlock: true }), "Unlocked")}
@@ -666,6 +688,33 @@ const ChatDetail = ({
         >
           <Input placeholder={DEFAULT_NOTIFY_SUBJECT} maxLength={200} value={subject} onChange={(e) => setSubject(e.target.value)} />
           <Button type="submit" variant="secondary" disabled={busy || subject.trim() === chat.notify_subject}>
+            Save
+          </Button>
+        </form>
+      </section>
+
+      {/* Notify interval */}
+      <section className="space-y-3">
+        <h3 className="font-semibold">Notify interval</h3>
+        <p className="text-xs text-muted-foreground">
+          Minutes each user must wait between two <Bell className="inline w-3 h-3" /> notifications in this chat.
+          0 = they can notify as often as they like.
+        </p>
+        <form
+          className="flex gap-2 items-center"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const err = intervalError(interval);
+            if (err) return toast.error(err);
+            run(() => api("PUT", "", { name: chat.name, notify_interval: Number(interval) }), "Notify interval saved");
+          }}
+        >
+          <Input
+            type="number" inputMode="numeric" min={0} max={MAX_NOTIFY_INTERVAL} className="w-32"
+            value={interval} onChange={(e) => setInterval_(e.target.value)}
+          />
+          <span className="text-sm text-muted-foreground">min</span>
+          <Button type="submit" variant="secondary" disabled={busy || interval.trim() === String(chat.notify_interval)}>
             Save
           </Button>
         </form>

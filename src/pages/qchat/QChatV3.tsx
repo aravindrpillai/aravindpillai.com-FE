@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Trash2, Send, Reply, Loader2, Paperclip, X, Play, FileText, Download, Eye, Image as ImageIcon, Video, Mail } from "lucide-react";
+import { Bell, Trash2, Send, Reply, Copy, Loader2, Paperclip, X, Play, FileText, Download, Eye, Image as ImageIcon, Video, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ApiClient from "@/lib/api";
@@ -9,11 +10,12 @@ import {
   deriveKeys,
   encryptMessage,
   decryptMessage,
-  encryptBytes,
-  decryptBytes,
+  encryptFile,
+  decryptFile,
   type QChatKeys,
 } from "@/lib/qchatCrypto";
 import { isHeicFile, isHeicMime, heicFileToJpeg, heicToJpeg } from "@/lib/heic";
+import { resolveMime, playbackMime, MAX_INLINE_IMAGE_BYTES } from "@/lib/mediaTypes";
 
 type SenderType = "me" | "other";
 
@@ -88,6 +90,7 @@ const previewOf = (m: UiMessage) => {
 interface ViewerState {
   url: string;
   kind: "image" | "video";
+  name: string; // used for the download fallback when the browser can't show the format
   oneTimeId?: string; // set when this is a view-once item: removed from the chat on close
 }
 
@@ -131,7 +134,68 @@ const WS_PING_MS = 25_000; // keep-alive so proxies don't drop an idle socket
 const WS_MAX_RETRY_MS = 30_000;
 const WS_CLOSE_AUTH_FAILED = 4001;
 const WS_CLOSE_REVOKED = 4002;
-const MAX_FILE_BYTES = 15 * 1024 * 1024; // must match QCHAT_MAX_FILE_BYTES on the server
+// Max plaintext size. The server limit (QCHAT_MAX_FILE_BYTES) is on the ciphertext, which adds
+// ~16 bytes per MiB, so the server allows 201 MiB.
+const MAX_FILE_BYTES = 200 * 1024 * 1024;
+const MAX_FILE_LABEL = "200 MB";
+
+/** Upload / download progress shown in the overlay. */
+interface Transfer {
+  label: string; // "Encrypting", "Uploading", "Downloading", "Decrypting"
+  fraction: number | null; // 0..1, null = unknown
+  detail?: string;
+  cancel?: () => void;
+}
+
+/** POST a multipart form with upload progress. Resolves with the status (0 = network error) and JSON body. */
+const xhrUpload = (
+  url: string,
+  headers: Record<string, string>,
+  body: FormData,
+  signal: AbortSignal,
+  onProgress: (loaded: number, total: number) => void
+): Promise<{ status: number; data: any }> => // eslint-disable-line @typescript-eslint/no-explicit-any
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    // No Content-Type header: the browser sets the multipart boundary.
+    Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+    xhr.upload.onprogress = (e) => onProgress(e.loaded, e.lengthComputable ? e.total : 0);
+    xhr.onload = () => {
+      let data: unknown = {};
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* non-JSON error page (e.g. proxy 413) */
+      }
+      resolve({ status: xhr.status, data });
+    };
+    xhr.onerror = () => resolve({ status: 0, data: {} });
+    xhr.onabort = () => reject(new DOMException("Aborted", "AbortError"));
+    if (signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    xhr.send(body);
+  });
+
+/** Read a fetch response body into a Blob, reporting progress from Content-Length. */
+const readWithProgress = async (
+  resp: Response,
+  onProgress: (fraction: number | null, detail: string) => void
+): Promise<Blob> => {
+  const total = Number(resp.headers.get("Content-Length")) || 0;
+  if (!resp.body) return resp.blob();
+  const reader = resp.body.getReader();
+  const parts: BlobPart[] = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    loaded += value.byteLength;
+    onProgress(total ? loaded / total : null, total ? `${formatSize(loaded)} / ${formatSize(total)}` : formatSize(loaded));
+  }
+  return new Blob(parts);
+};
 
 /** wss://<api host>/ws/qchat/ (override with VITE_QCHAT_WS_URL if needed). */
 const buildWsUrl = () => {
@@ -176,6 +240,10 @@ const QChatV3 = () => {
   const [emailDraft, setEmailDraft] = useState("");
   const [emailCurrent, setEmailCurrent] = useState<string | null>(null);
   const [emailBusy, setEmailBusy] = useState(false);
+
+  // ----- File transfer progress (upload / download) -----
+  const [transfer, setTransfer] = useState<Transfer | null>(null);
+  const transferAbortRef = useRef<AbortController | null>(null);
 
   // ----- Attachment waiting to be sent -----
   const [pending, setPending] = useState<{ file: File; oneTime: boolean } | null>(null);
@@ -226,6 +294,9 @@ const QChatV3 = () => {
   // ---------------------------
   const lock = useCallback(() => {
     sessionRef.current += 1; // invalidates any in-flight request results
+    transferAbortRef.current?.abort(); // stop any upload/download in progress
+    transferAbortRef.current = null;
+    setTransfer(null);
     setKeys(null); // also closes the WebSocket (effect cleanup)
     setMessages([]);
     setInputValue("");
@@ -352,11 +423,13 @@ const QChatV3 = () => {
             // Meta (encrypted): {"t":"file","mime","name","size","reply"}; older images: {"t":"img","mime"}.
             try {
               const meta = JSON.parse(decrypted);
-              const mime = typeof meta?.mime === "string" ? meta.mime : "";
+              const fname = typeof meta?.name === "string" ? meta.name : "file";
+              // Older uploads may have an empty/generic type: guess it from the file name.
+              const mime = resolveMime(typeof meta?.mime === "string" ? meta.mime : "", meta?.t === "img" ? "" : fname);
               file = {
                 kind: meta?.t === "img" ? "image" : kindOf(mime),
                 mime,
-                name: typeof meta?.name === "string" ? meta.name : "file",
+                name: fname,
                 size: typeof meta?.size === "number" ? meta.size : undefined,
               };
               replyTo = typeof meta?.reply === "string" ? meta.reply : undefined;
@@ -580,7 +653,7 @@ const QChatV3 = () => {
   // ---------------------------
   /** Fetch + decrypt one upload. Throws an Error whose message is the HTTP status on failure. */
   const fetchDecrypted = useCallback(
-    async (id: string, mime: string): Promise<string> => {
+    async (id: string, mime: string, onProgress?: (t: Transfer) => void): Promise<string> => {
       if (!authHeaders || !keys) throw new Error("locked");
       const session = sessionRef.current;
       const url = ApiClient.buildFullUrl(`${import.meta.env.VITE_QUICK_CHAT_CONVERSATIONS_FILES ?? "qchat/files/"}${id}/`);
@@ -590,11 +663,16 @@ const QChatV3 = () => {
         throw new Error("403");
       }
       if (!resp.ok) throw new Error(String(resp.status));
-      const plain = await decryptBytes(keys, await resp.arrayBuffer());
+      if (session !== sessionRef.current) throw new Error("locked");
+      const cipher = await readWithProgress(resp, (fraction, detail) =>
+        onProgress?.({ label: "Downloading", fraction, detail })
+      );
+      if (session !== sessionRef.current) throw new Error("locked");
+      const plain = await decryptFile(keys, cipher, (fraction) => onProgress?.({ label: "Decrypting", fraction }));
       if (session !== sessionRef.current) throw new Error("locked");
       // Only image/video types are rendered; everything else is an opaque download.
       const k = kindOf(mime);
-      const safeMime = k === "file" ? "application/octet-stream" : mime;
+      const safeMime = k === "file" ? "application/octet-stream" : playbackMime(mime);
       const blob = new Blob([plain], { type: safeMime });
       // HEIC/HEIF (Apple photos) only render in Safari: decode to JPEG for everyone else.
       if (isHeicMime(mime)) {
@@ -614,10 +692,10 @@ const QChatV3 = () => {
 
   /** Cached loader for normal (not view-once) uploads. */
   const loadImage = useCallback(
-    (id: string, mime: string): Promise<string> => {
+    (id: string, mime: string, onProgress?: (t: Transfer) => void): Promise<string> => {
       const cached = imageCacheRef.current.get(id);
       if (cached) return cached;
-      const p = fetchDecrypted(id, mime);
+      const p = fetchDecrypted(id, mime, onProgress);
       imageCacheRef.current.set(id, p);
       p.catch(() => imageCacheRef.current.delete(id));
       return p;
@@ -651,9 +729,13 @@ const QChatV3 = () => {
       const once = !!msg.oneTime;
       if (once && msg.sender === "me") return; // sender can't open their own view-once upload
 
+      const session = sessionRef.current;
+      const onProgress = (t: Transfer) => {
+        if (session === sessionRef.current) setTransfer(t);
+      };
       try {
-        setLoading(true);
-        const url = once ? await fetchDecrypted(msg.id, mime) : await loadImage(msg.id, mime);
+        setTransfer({ label: "Downloading", fraction: null });
+        const url = once ? await fetchDecrypted(msg.id, mime, onProgress) : await loadImage(msg.id, mime, onProgress);
         if (kind === "file") {
           triggerDownload(url, name);
           if (once) {
@@ -667,7 +749,7 @@ const QChatV3 = () => {
           oneTimeUrlRef.current = url;
         }
         setVideoFailed(false);
-        setViewer({ url, kind, ...(once ? { oneTimeId: msg.id } : {}) });
+        setViewer({ url, kind, name, ...(once ? { oneTimeId: msg.id } : {}) });
       } catch (e) {
         const code = e instanceof Error ? e.message : "";
         if (code === "403" || code === "locked") return;
@@ -679,7 +761,7 @@ const QChatV3 = () => {
         console.error("Open file failed:", e);
         alert("Could not open the file.");
       } finally {
-        setLoading(false);
+        if (session === sessionRef.current) setTransfer(null);
       }
     },
     [fetchDecrypted, loadImage, removeLocal]
@@ -705,6 +787,7 @@ const QChatV3 = () => {
       const resp = await fetch(url, { method: "PUT", headers });
       const data = await resp.json();
       if (resp.status < 300) alert("Notified.!");
+      else if (resp.status === 429) alert(data?.messages?.[0] || "Chill Bae, it costs, please wait a bit to send again.");
       else alert("Failed : " + (data?.messages?.[0] || "Unknown error"));
     } catch (e) {
       console.error("Failed to send email:", e);
@@ -872,11 +955,22 @@ const QChatV3 = () => {
   );
 
   // Encrypt the file in the browser, then upload only the ciphertext. Returns true on success.
+  // Uses XMLHttpRequest (not fetch) because only XHR reports upload progress.
   const uploadFile = useCallback(
     async (file: File, oneTime: boolean, replyId?: string): Promise<boolean> => {
       if (!authHeaders || !keys) return false;
-      const cipher = await encryptBytes(keys, await file.arrayBuffer());
-      const meta = await encryptMessage(
+      const session = sessionRef.current;
+      const abort = new AbortController();
+      transferAbortRef.current = abort;
+      const cancel = () => abort.abort();
+      const show = (t: Transfer) => {
+        if (session === sessionRef.current && !abort.signal.aborted) setTransfer({ ...t, cancel });
+      };
+
+      try {
+        show({ label: "Encrypting", fraction: 0 });
+        const cipher = await encryptFile(keys, file, (f) => show({ label: "Encrypting", fraction: f }), abort.signal);
+        const meta = await encryptMessage(
         keys,
         JSON.stringify({
           t: "file",
@@ -887,28 +981,42 @@ const QChatV3 = () => {
         })
       );
 
-      const form = new FormData();
-      form.append("file", new Blob([cipher], { type: "application/octet-stream" }), "blob");
-      form.append("sender", sender ?? "");
-      form.append("message", meta);
-      if (oneTime) form.append("one_time", "true");
+        // Text fields first so the server sees sender/message before the big file part.
+        const form = new FormData();
+        form.append("sender", sender ?? "");
+        form.append("message", meta);
+        if (oneTime) form.append("one_time", "true");
+        form.append("file", cipher, "blob");
 
-      const url = ApiClient.buildFullUrl(import.meta.env.VITE_QUICK_CHAT_CONVERSATIONS_FILES ?? "qchat/files/");
-      // No Content-Type header: the browser sets the multipart boundary.
-      const resp = await fetch(url, { method: "POST", headers: authHeaders, body: form });
-      const data = await resp.json().catch(() => ({}));
+        const url = ApiClient.buildFullUrl(import.meta.env.VITE_QUICK_CHAT_CONVERSATIONS_FILES ?? "qchat/files/");
+        show({ label: "Uploading", fraction: 0, detail: `0 / ${formatSize(cipher.size)}` });
+        const { status, data } = await xhrUpload(url, authHeaders, form, abort.signal, (loaded, total) =>
+          show({ label: "Uploading", fraction: total ? loaded / total : null, detail: `${formatSize(loaded)} / ${formatSize(total)}` })
+        );
+        if (session !== sessionRef.current) return false;
 
-      if (resp.status === 403) {
-        lock();
-        return false;
+        if (status === 403) {
+          lock();
+          return false;
+        }
+        if (status === 413) {
+          alert(`File is too large (max ${MAX_FILE_LABEL}).`);
+          return false;
+        }
+        if (status < 200 || status >= 300) {
+          alert("Failed to send file: " + (data?.messages?.[0] || status || "network error"));
+          return false;
+        }
+        const apiMsg = data?.data as ApiMsg;
+        if (apiMsg?.id) await ingest([apiMsg]);
+        return true;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return false; // cancelled / locked
+        throw e;
+      } finally {
+        if (transferAbortRef.current === abort) transferAbortRef.current = null;
+        if (session === sessionRef.current) setTransfer(null);
       }
-      if (!resp.ok) {
-        alert("Failed to send file: " + (data?.messages?.[0] || resp.status));
-        return false;
-      }
-      const apiMsg = data?.data as ApiMsg;
-      if (apiMsg?.id) await ingest([apiMsg]);
-      return true;
     },
     [authHeaders, keys, sender, ingest, lock]
   );
@@ -985,12 +1093,14 @@ const QChatV3 = () => {
       setCodePromptOpen(true);
       return;
     }
-    let file = picked;
+    // Browsers often give an empty/generic type (HEIC, MKV, AVI, 3GP...): fill it in from the extension.
+    const mime = resolveMime(picked.type, picked.name);
+    let file = mime === picked.type ? picked : new File([picked], picked.name, { type: mime, lastModified: picked.lastModified });
     // Apple HEIC/HEIF photos: convert to JPEG so every browser can preview them.
-    if (await isHeicFile(picked)) {
+    if (await isHeicFile(file)) {
       try {
         setLoading(true);
-        file = await heicFileToJpeg(picked);
+        file = await heicFileToJpeg(file);
       } catch (e) {
         console.warn("HEIC to JPEG conversion failed, sending original:", e);
         // Keep it tagged as an image so recipients still try to decode it on display.
@@ -1001,8 +1111,8 @@ const QChatV3 = () => {
         setLoading(false);
       }
     }
-    if (file.size > MAX_FILE_BYTES - 64) {
-      alert("File is too large (max 15 MB).");
+    if (file.size > MAX_FILE_BYTES) {
+      alert(`File is too large (max ${MAX_FILE_LABEL}).`);
       return;
     }
     setPending({ file, oneTime: false });
@@ -1065,14 +1175,41 @@ const QChatV3 = () => {
     <div className="h-dvh bg-muted/30 flex flex-col overflow-hidden">
       {/* Loading overlay */}
       <AnimatePresence>
-        {loading && (
+        {(loading || transfer) && (
           <motion.div
-            className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <Loader2 className="h-10 w-10 animate-spin text-white" />
+            {transfer ? (
+              <div className="w-full max-w-xs rounded-2xl bg-background p-4 shadow-xl" role="progressbar"
+                aria-valuemin={0} aria-valuemax={100}
+                aria-valuenow={transfer.fraction == null ? undefined : Math.round(transfer.fraction * 100)}>
+                <div className="flex items-center justify-between gap-2 text-sm font-medium">
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> {transfer.label}…
+                  </span>
+                  {transfer.fraction != null && <span className="tabular-nums">{Math.round(transfer.fraction * 100)}%</span>}
+                </div>
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full bg-primary transition-[width] duration-150 ${transfer.fraction == null ? "w-1/3 animate-pulse" : ""}`}
+                    style={transfer.fraction == null ? undefined : { width: `${Math.max(2, transfer.fraction * 100)}%` }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums truncate">{transfer.detail ?? "End-to-end encrypted"}</span>
+                  {transfer.cancel && (
+                    <button type="button" onClick={transfer.cancel} className="shrink-0 font-medium text-foreground hover:underline">
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <Loader2 className="h-10 w-10 animate-spin text-white" />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1103,7 +1240,18 @@ const QChatV3 = () => {
                 <Eye className="w-3.5 h-3.5" /> View once · disappears when closed
               </span>
             )}
-            {viewer.kind === "image" ? (
+            {videoFailed ? (
+              <div className="flex flex-col items-center gap-3 text-center px-6" onClick={(e) => e.stopPropagation()}>
+                <p className="text-white/80 text-sm">
+                  This {viewer.kind === "image" ? "image" : "video"} format can't be shown in this browser.
+                </p>
+                {!viewer.oneTimeId && (
+                  <Button type="button" variant="secondary" size="sm" onClick={() => triggerDownload(viewer.url, viewer.name)}>
+                    <Download className="w-4 h-4 mr-1.5" /> Download to open it
+                  </Button>
+                )}
+              </div>
+            ) : viewer.kind === "image" ? (
               <motion.img
                 src={viewer.url}
                 alt=""
@@ -1113,12 +1261,9 @@ const QChatV3 = () => {
                 exit={{ scale: 0.98 }}
                 onClick={(e) => e.stopPropagation()}
                 onContextMenu={(e) => e.preventDefault()}
+                onError={() => setVideoFailed(true)}
                 draggable={false}
               />
-            ) : videoFailed ? (
-              <p className="text-white/80 text-sm text-center px-6" onClick={(e) => e.stopPropagation()}>
-                This video format can't be played in this browser.
-              </p>
             ) : (
               <video
                 src={viewer.url}
@@ -1486,10 +1631,12 @@ const ImageThumb = ({
 }) => {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [undecodable, setUndecodable] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setFailed(false);
+    setUndecodable(false);
     loadImage(id, mime)
       .then((u) => alive && setUrl(u))
       .catch(() => alive && setFailed(true));
@@ -1499,6 +1646,13 @@ const ImageThumb = ({
   }, [id, mime, loadImage]);
 
   if (failed) return <p className="text-sm italic opacity-70 px-2.5 py-1">&lt;Image unavailable&gt;</p>;
+  if (undecodable)
+    return (
+      <button type="button" onClick={onOpen} className="flex items-center gap-2 px-2.5 py-2 text-sm text-left" title="Open">
+        <ImageIcon className="w-5 h-5 shrink-0 opacity-70" />
+        <span className="opacity-80">Preview not supported · tap to open</span>
+      </button>
+    );
   if (!url)
     return (
       <div className="h-40 w-56 max-w-full rounded-lg bg-black/10 flex items-center justify-center">
@@ -1511,6 +1665,7 @@ const ImageThumb = ({
         src={url}
         alt=""
         className="max-h-64 max-w-full rounded-lg object-cover cursor-zoom-in"
+        onError={() => setUndecodable(true)}
         draggable={false}
         onContextMenu={(e) => e.preventDefault()}
       />
@@ -1537,6 +1692,11 @@ const FileTile = ({ message, isMe, onOpen }: { message: UiMessage; isMe: boolean
     title = `View once ${kindLabel(file.kind)}`;
     subtitle = isMe ? (opened.length ? `Opened by ${opened.join(", ")}` : "Not opened yet") : "Tap to open · can be opened once";
     icon = <Eye className="w-5 h-5" />;
+    action = null;
+  } else if (file.kind === "image") {
+    title = file.name;
+    subtitle = ["Photo", formatSize(file.size)].filter(Boolean).join(" · ");
+    icon = <ImageIcon className="w-5 h-5" />;
     action = null;
   } else if (file.kind === "video") {
     title = file.name;
@@ -1608,7 +1768,88 @@ const MessageBubble = ({
   const isMe = message.sender === "me";
   const hasFile = !!message.file;
   // Normal images show inline; videos, other files and view-once items use a tile.
-  const inlineImage = message.file?.kind === "image" && !message.oneTime;
+  // Big images are not auto-downloaded for everyone: they get a tile and load on tap.
+  const inlineImage =
+    message.file?.kind === "image" && !message.oneTime && (message.file.size ?? 0) <= MAX_INLINE_IMAGE_BYTES;
+
+  // ---- Touch gestures: swipe toward the centre to reply, long-press for a menu ----
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const touchRef = useRef<{ x: number; y: number; axis: "x" | "y" | null } | null>(null);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
+
+  const clearLongPress = () => {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  useEffect(() => clearLongPress, []);
+
+  const buzz = () => {
+    try { navigator.vibrate?.(15); } catch { /* not supported */ }
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY, axis: null };
+    longPressFired.current = false;
+    clearLongPress();
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = null;
+      longPressFired.current = true;
+      touchRef.current = null;
+      setDragX(0);
+      buzz();
+      setMenuOpen(true);
+    }, 500);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    const s = touchRef.current;
+    if (!s) return;
+    const t = e.touches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) clearLongPress();
+    if (!s.axis) {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        s.axis = "x";
+        setDragging(true);
+      } else if (Math.abs(dy) > 10) {
+        s.axis = "y";
+      }
+    }
+    if (s.axis !== "x") return;
+    // My messages sit on the right -> swipe left; theirs sit on the left -> swipe right.
+    const offset = isMe ? Math.max(-SWIPE_MAX, Math.min(0, dx)) : Math.min(SWIPE_MAX, Math.max(0, dx));
+    setDragX((prev) => {
+      if (Math.abs(prev) < SWIPE_TRIGGER && Math.abs(offset) >= SWIPE_TRIGGER) buzz();
+      return offset;
+    });
+  };
+
+  const onTouchEnd = () => {
+    clearLongPress();
+    if (touchRef.current?.axis === "x" && Math.abs(dragX) >= SWIPE_TRIGGER) onReply(message);
+    touchRef.current = null;
+    setDragging(false);
+    setDragX(0);
+  };
+
+  // Swallow the click that follows a long-press (e.g. so an image doesn't open).
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (longPressFired.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      longPressFired.current = false;
+    }
+  };
+
+  const swipeProgress = Math.min(1, Math.abs(dragX) / SWIPE_TRIGGER);
 
   return (
     <motion.div
@@ -1616,9 +1857,35 @@ const MessageBubble = ({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className={`flex ${isMe ? "justify-end" : "justify-start"} group scroll-mt-4`}
+      className={`relative flex ${isMe ? "justify-end" : "justify-start"} group scroll-mt-4`}
     >
-      <div className="relative max-w-[80%] sm:max-w-[70%]">
+      {/* Reply icon revealed behind the bubble while swiping */}
+      {dragX !== 0 && (
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 ${isMe ? "right-1" : "left-1"} flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground pointer-events-none`}
+          style={{ opacity: swipeProgress, transform: `translateY(-50%) scale(${0.6 + 0.4 * swipeProgress})` }}
+        >
+          <Reply className="w-4 h-4" />
+        </div>
+      )}
+
+      <div
+        className="relative max-w-[80%] sm:max-w-[70%] [@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none]"
+        style={{
+          transform: dragX ? `translateX(${dragX}px)` : undefined,
+          transition: dragging ? "none" : "transform 200ms ease-out",
+          touchAction: "pan-y",
+        }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        onClickCapture={onClickCapture}
+        onContextMenu={(e) => {
+          // Touch long-press is handled above; keep the native menu from popping up.
+          if (window.matchMedia("(hover: none)").matches) e.preventDefault();
+        }}
+      >
         <div
           className={`${inlineImage ? "p-1.5" : hasFile ? "p-2" : "px-4 py-2.5"} rounded-2xl transition-shadow duration-300 ${isMe ? "bg-primary text-primary-foreground rounded-br-md" : "bg-muted text-foreground rounded-bl-md"
             } ${highlighted ? "ring-4 ring-amber-400/80 shadow-lg" : ""}`}
@@ -1662,9 +1929,9 @@ const MessageBubble = ({
           </span>
         </div>
 
-        {/* Actions: on hover (desktop), always visible on touch screens */}
+        {/* Actions: on hover (desktop). Touch screens use swipe-to-reply / long-press instead. */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ${isMe ? "-left-16" : "-right-16"
+          className={`absolute top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:hidden transition-opacity ${isMe ? "-left-16" : "-right-16"
             }`}
         >
           <Button
@@ -1692,7 +1959,82 @@ const MessageBubble = ({
           )}
         </div>
       </div>
+
+      {/* Long-press action sheet (touch screens) */}
+      {menuOpen && (
+        <MessageActionSheet
+          canDelete={isMe}
+          canCopy={!hasFile && !!message.content}
+          onClose={() => setMenuOpen(false)}
+          onReply={() => {
+            setMenuOpen(false);
+            onReply(message);
+          }}
+          onCopy={() => {
+            setMenuOpen(false);
+            navigator.clipboard?.writeText(message.content).catch(() => { /* ignore */ });
+          }}
+          onDelete={() => {
+            setMenuOpen(false);
+            onDelete(message.id);
+          }}
+        />
+      )}
     </motion.div>
+  );
+};
+
+const SWIPE_TRIGGER = 60; // px of horizontal travel that triggers a reply
+const SWIPE_MAX = 80; // the bubble won't travel further than this
+
+interface MessageActionSheetProps {
+  canDelete: boolean;
+  canCopy: boolean;
+  onClose: () => void;
+  onReply: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}
+
+const MessageActionSheet = ({ canDelete, canCopy, onClose, onReply, onCopy, onDelete }: MessageActionSheetProps) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const item = "flex w-full items-center gap-3 px-5 py-3.5 text-sm text-left active:bg-muted";
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose} onContextMenu={(e) => e.preventDefault()}>
+      <div className="absolute inset-0 bg-black/40" />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        transition={{ type: "tween", duration: 0.18 }}
+        className="relative w-full max-w-md rounded-t-2xl bg-background border-t shadow-xl pb-[env(safe-area-inset-bottom)] select-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-muted" />
+        <button type="button" className={item} onClick={onReply}>
+          <Reply className="w-4 h-4" /> Reply
+        </button>
+        {canCopy && (
+          <button type="button" className={item} onClick={onCopy}>
+            <Copy className="w-4 h-4" /> Copy
+          </button>
+        )}
+        {canDelete && (
+          <button type="button" className={`${item} text-destructive`} onClick={onDelete}>
+            <Trash2 className="w-4 h-4" /> Delete
+          </button>
+        )}
+        <button type="button" className={`${item} justify-center border-t text-muted-foreground`} onClick={onClose}>
+          Cancel
+        </button>
+      </motion.div>
+    </div>,
+    document.body
   );
 };
 
