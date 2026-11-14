@@ -9,14 +9,14 @@ import Videos from "./pages/Videos";
 import Photos from "./pages/Photos";
 import NotFound from "./pages/NotFound";
 import Anonymous from "./pages/anonymous/Anonymous";
-import QChats from "./pages/qchat/QChats";
 import QChatV3 from "./pages/qchat/QChatV3";
-import QChatStable from "./pages/qchat/QChatStable";
+import QChatRegister from "./pages/qchat/QChatRegister";
 import ReadAnonymous from "./pages/anonymous/ReadAnonymous";
 import TextBoxPage from "./pages/textbox/Index";
- import FileGallery from "./pages/file/FileGallery";
 import CAA from "./pages/CAA";
 import Beneva from "./pages/Beneva";
+import Links from "./pages/links/Links";
+import TextboxList from "./pages/links/TextboxList";
 
 const queryClient = new QueryClient();
 
@@ -39,16 +39,16 @@ const App = () => (
           {/* Textbox */}
           <Route path="/textbox" element={<TextBoxPage />} />
           <Route path="/textbox/:code" element={<TextBoxPage />} />
+          <Route path="/listall/textbox" element={<TextboxList />} />
+
+          {/* Admin links page (password = ADMIN_LINKS_PW in the backend env) */}
+          <Route path="/links" element={<Links />} />
           
 
 
-          {/* Anonymous */}
+          {/* Quick Chat */}
           <Route path="/qchat/:name/:sender" element={<QChatV3 />} />
-          <Route path="/qchatstable/:name/:sender" element={<QChatStable />} />
-          
-          <Route path="/qchats" element={<QChats />} />
-
-          <Route path="/file/:name/:sender" element={<FileGallery />} />
+          <Route path="/quickchat/register" element={<QChatRegister />} />
           <Route path="/caa" element={<CAA />} />
           <Route path="/beneva" element={<Beneva />} />
 

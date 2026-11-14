@@ -7,6 +7,65 @@ import { Textarea } from "@/components/ui/textarea";
 import profileImage from "@/assets/profile.png";
 import ApiClient from "@/lib/api";
 
+const VISITOR_KEY = "anon_vid";
+
+/** Returns a persistent id for this browser (localStorage, with cookie fallback). */
+function getVisitorId(): string {
+  const fromCookie = document.cookie
+    .split("; ")
+    .find((c) => c.startsWith(VISITOR_KEY + "="))
+    ?.split("=")[1];
+  let id: string | null = null;
+  try {
+    id = localStorage.getItem(VISITOR_KEY);
+  } catch {
+    /* storage blocked */
+  }
+  id = id || fromCookie || null;
+  if (!id) {
+    id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+  try {
+    localStorage.setItem(VISITOR_KEY, id);
+  } catch {
+    /* storage blocked */
+  }
+  document.cookie = `${VISITOR_KEY}=${id}; max-age=${60 * 60 * 24 * 365 * 5}; path=/; SameSite=Lax`;
+  return id;
+}
+
+function getClientInfo() {
+  const nav = navigator as Navigator & {
+    connection?: { effectiveType?: string; downlink?: number };
+    deviceMemory?: number;
+    userAgentData?: { platform?: string; mobile?: boolean; brands?: { brand: string; version: string }[] };
+  };
+  return {
+    user_agent: nav.userAgent,
+    platform: nav.userAgentData?.platform || nav.platform,
+    mobile: nav.userAgentData?.mobile,
+    brands: nav.userAgentData?.brands?.map((b) => `${b.brand} ${b.version}`),
+    language: nav.language,
+    languages: nav.languages,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone_offset_min: new Date().getTimezoneOffset(),
+    screen: `${screen.width}x${screen.height}`,
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    pixel_ratio: window.devicePixelRatio,
+    color_depth: screen.colorDepth,
+    cpu_cores: nav.hardwareConcurrency,
+    device_memory_gb: nav.deviceMemory,
+    touch_points: nav.maxTouchPoints,
+    connection: nav.connection?.effectiveType,
+    referrer: document.referrer || null,
+    dark_mode: window.matchMedia?.("(prefers-color-scheme: dark)").matches,
+    local_time: new Date().toString(),
+  };
+}
+
 type AlertState = {
   type: "success" | "error";
   text: string;
@@ -66,7 +125,11 @@ const Anonymous = () => {
       const response = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: msg }),
+        body: JSON.stringify({
+          message: msg,
+          visitor_id: getVisitorId(),
+          client_info: getClientInfo(),
+        }),
       });
 
       let respData: any = null;

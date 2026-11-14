@@ -1,167 +1,72 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Helmet } from "react-helmet";
-import { useParams, useNavigate  } from "react-router-dom";
-import ApiClient from "@/lib/api";
-import "./style.css";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { normalizeCode } from "@/lib/textboxCrypto";
+import TextboxSession from "./TextboxSession";
+
+const MAX_CODE = 64;
 
 export default function TextBoxPage() {
-  const navigate = useNavigate();
   const { code } = useParams();
-  const [status, setStatus] = useState<{ text: string; color: string }>({
-    text: "",
-    color: "",
-  });
-  const [loading, setLoading] = useState(false);
-  
-      
-  const textBoxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!code) {
-      const enteredCode = prompt("Enter Text Code");
-      if (enteredCode) {
-        navigate(`/textbox/${enteredCode}`, { replace: true });
-      }
-    }
-  }, [code, navigate]);
-
-  useEffect(() => {
-    if (code) {
-      refreshData();
-    }
-  }, [code]);
-
-  const handlePaste = (event: ClipboardEvent) => {
-    const clipboardItems = event.clipboardData?.items;
-    if (!clipboardItems) return;
-
-    for (let item of clipboardItems) {
-      if (item.type.startsWith("image/")) {
-        const blob = item.getAsFile();
-        if (!blob) continue;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = document.createElement("img");
-          img.style.maxWidth = "100%";
-          img.style.maxHeight = "300px";
-          img.style.margin = "10px 0";
-          img.src = e.target?.result as string;
-          textBoxRef.current?.appendChild(img);
-        };
-        reader.readAsDataURL(blob);
-        event.preventDefault();
-      }
-    }
-  };
-
-  useEffect(() => {
-    const el = textBoxRef.current;
-    if (el) {
-      el.addEventListener("paste", handlePaste as any);
-    }
-    return () => {
-      if (el) el.removeEventListener("paste", handlePaste as any);
-    };
-  }, []);
-
-  const submitData = async () => {
-    if (!code) return;
-    setLoading(true);
-    setStatus({ text: "", color: "" });
-    try {
-      const content = textBoxRef.current?.innerHTML || "";
-      let url = ApiClient.buildFullUrl(import.meta.env.VITE_TEXTBOX, {"code":code})
-      var data = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ "content":content }),
-      }
-      const response = await fetch(url, data);
-      if (response.ok) {
-        setStatus({ text: "Success", color: "green" });
-      } else {
-        setStatus({ text: "Failed", color: "red" });
-      }
-    } catch (err) {
-      setStatus({ text: "Failed", color: "red" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshData = async () => {
-    if (!code) return;
-    setLoading(true);
-    setStatus({ text: "", color: "" });
-    try {
-      let url = ApiClient.buildFullUrl(import.meta.env.VITE_TEXTBOX, {"code":code})
-      const response = await fetch(`${url}?code=${code}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (textBoxRef.current) {
-          textBoxRef.current.innerHTML = data.data || "";
-        }
-      } else {
-        setStatus({ text: "Failed to refresh content", color: "red" });
-      }
-    } catch (err) {
-      setStatus({ text: "Failed to refresh content", color: "red" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetData = () => {
-    if (textBoxRef.current) textBoxRef.current.innerHTML = "";
-  };
+  const normalized = code ? normalizeCode(code) : "";
 
   return (
     <>
       <Helmet>
-        <title>Aravind Text Area</title>
+        <title>Textbox · Aravind R Pillai</title>
+        <meta name="robots" content="noindex, nofollow" />
+        {/* The code is in the URL path: never leak it to other sites via Referer. */}
+        <meta name="referrer" content="no-referrer" />
       </Helmet>
-      <div className="container">
-        <div className="button-container">
-          <button id="reset" onClick={resetData}>
-            Reset
-          </button>
-          <button id="refresh" onClick={refreshData}>
-            Refresh
-          </button>
-          <div
-            id="status-message"
-            className="message"
-            style={{ color: status.color }}
-          >
-            {status.text}
-          </div>
-          <button id="submit" onClick={submitData}>
-            Submit
-          </button>
-        </div>
-
-        <div
-          ref={textBoxRef}
-          id="text-box"
-          className="textbox"
-          contentEditable="true"
-          data-placeholder="Enter your text, paste images, or other content here..."
-        />
-
-        {loading && (
-          <div id="loading-overlay" className="loading-overlay active">
-            <div>Loading...</div>
-          </div>
-        )}
-      </div>
-
-      <footer>
-        Credits:{" "}
-        <a href="http://aravindrpillai.com" target="_blank" rel="noreferrer">
-          Aravind R Pillai
-        </a>
-      </footer>
+      {normalized ? <TextboxSession key={normalized} code={normalized} /> : <CodeEntry />}
     </>
+  );
+}
+
+function CodeEntry() {
+  const navigate = useNavigate();
+  const [value, setValue] = useState("");
+  const code = normalizeCode(value);
+  const valid = code.length > 0 && code.length <= MAX_CODE && !code.includes("/");
+
+  const open = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (valid) navigate(`/textbox/${encodeURIComponent(code)}`);
+  };
+
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-muted/40 px-4">
+      <form onSubmit={open} className="w-full max-w-sm rounded-2xl border bg-background p-8 shadow-sm">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+          <ShieldCheck className="h-6 w-6 text-primary" />
+        </div>
+        <h1 className="text-center text-xl font-semibold">Open a textbox</h1>
+        <p className="mb-6 mt-1 text-center text-sm text-muted-foreground">
+          Enter a code. The same code opens the same textbox on any device.
+        </p>
+        <Input
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          maxLength={MAX_CODE}
+          placeholder="Textbox code"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-label="Textbox code"
+          className="h-11 text-base"
+        />
+        <Button type="submit" disabled={!valid} className="mt-3 h-11 w-full gap-2">
+          Open <ArrowRight className="h-4 w-4" />
+        </Button>
+        <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
+          End-to-end encrypted. Your content is encrypted on this device with a key derived from the code before it
+          is sent, and the server never sees the code. Pick a long, unguessable code, or add a PIN lock once inside.
+        </p>
+      </form>
+    </div>
   );
 }
