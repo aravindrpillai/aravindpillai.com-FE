@@ -44,6 +44,12 @@
     --input: 30 15% 88%;
     --ring: 24 80% 55%;
 
+    /* Playground apps (ExamPrep, File Analyser, FinanceAI) */
+    --success: 152 60% 38%;
+    --success-foreground: 0 0% 100%;
+    --info: 210 80% 52%;
+    --info-foreground: 0 0% 100%;
+
     --radius: 0.75rem;
 
     /* Custom tokens */
@@ -84,6 +90,11 @@
     --border: 220 15% 22%;
     --input: 220 15% 22%;
     --ring: 24 80% 60%;
+
+    --success: 152 55% 45%;
+    --success-foreground: 220 20% 10%;
+    --info: 210 80% 62%;
+    --info-foreground: 220 20% 10%;
   }
 }
 
@@ -171,4 +182,20 @@
 html, body {
   width: 100%;
   overflow-x: hidden;
+}
+
+/* AI page: blinking caret at the end of a reply that is still streaming */
+.ai-streaming .prose > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  border-radius: 2px;
+  background: hsl(var(--primary));
+  animation: ai-caret 1s steps(2, start) infinite;
+}
+@keyframes ai-caret {
+  to { visibility: hidden; }
 }

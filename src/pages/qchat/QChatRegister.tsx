@@ -1,7 +1,8 @@
 /**
- * /quickchat/register — admin page for QChat.
+ * QuickChat admin — shown inside the admin panel (/admin/qchat).
  *
- * - Protected by the QChat admin password (kept in memory only, never persisted).
+ * - Protected by the QChat admin password (kept in memory only, never persisted), on top of
+ *   the admin panel's own password.
  * - Create chats, register users, set/reset the shared chat password.
  * - Each user can have ONE optional notification email (users can also change it from inside the chat).
  * - The chat password never leaves this browser: it is stretched with PBKDF2
@@ -10,9 +11,8 @@
  *   encrypt messages, so the server can never read conversations.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Bell, Check, Copy, Loader2, Lock, LogOut, Mail, MessageSquare, Pencil, Plus, RefreshCw,
+  Bell, Check, Copy, Loader2, Lock, LogOut, Mail, MessageSquare, Pencil, Plus, RefreshCw,
   ShieldCheck, Trash2, Unlock, UserPlus, X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,7 +58,6 @@ const chatLink = (chat: string, user: string) =>
 const digitsOnly = (v: string) => v.replace(/\D/g, "").slice(0, 4);
 
 const QChatRegister = () => {
-  const navigate = useNavigate();
 
   // ----- Admin session (memory only) -----
   const [adminPw, setAdminPw] = useState<string | null>(null);
@@ -154,9 +153,9 @@ const QChatRegister = () => {
   // ---------------------------------------------------------------- login screen
   if (!adminPw) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="flex justify-center py-6 sm:py-12">
         <form
-          className="w-full max-w-sm p-8 rounded-2xl bg-card border shadow-xl space-y-6"
+          className="w-full max-w-sm p-8 rounded-2xl bg-card border-2 border-border shadow-soft space-y-6"
           onSubmit={(e) => {
             e.preventDefault();
             login();
@@ -166,8 +165,10 @@ const QChatRegister = () => {
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
               <Lock className="w-7 h-7 text-primary" />
             </div>
-            <h1 className="text-xl font-semibold">QuickChat Admin</h1>
-            <p className="text-sm text-muted-foreground text-center">Enter the admin password to manage chats.</p>
+            <h2 className="text-xl font-semibold">Maintenance is locked</h2>
+            <p className="text-sm text-muted-foreground text-center">
+              Enter the admin password to manage server.
+            </p>
           </div>
           <Input
             type="password"
@@ -187,25 +188,24 @@ const QChatRegister = () => {
 
   // ---------------------------------------------------------------- main screen
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur-sm">
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-lg sm:text-xl font-bold flex-1">QuickChat · Register</h1>
+    <div className="rounded-2xl border-2 border-border bg-card overflow-hidden flex flex-col">
+      <header className="border-b border-border bg-muted/30">
+        <div className="flex items-center gap-3 px-4 sm:px-5 py-3">
+          <div className="flex-1 min-w-0 text-sm text-muted-foreground">
+            {chats.length} chat{chats.length === 1 ? "" : "s"} · {chats.reduce((n, c) => n + c.users.length, 0)} users
+          </div>
           <Button variant="ghost" size="icon" title="Refresh" onClick={refresh}>
             <RefreshCw className="w-4 h-4" />
           </Button>
-          <Button variant="outline" size="sm" className="gap-2" onClick={logout}>
-            <LogOut className="w-4 h-4" /> Sign out
+          <Button variant="outline" size="sm" className="gap-2" onClick={logout} title="Lock QuickChat again">
+            <LogOut className="w-4 h-4" /> Lock
           </Button>
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col md:flex-row min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row min-h-[520px]">
         {/* Chat list */}
-        <aside className="w-full md:w-72 border-b md:border-b-0 md:border-r bg-muted/30">
+        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r bg-muted/20">
           <div className="p-3">
             <Button
               className="w-full gap-2"
@@ -217,7 +217,7 @@ const QChatRegister = () => {
               <Plus className="w-4 h-4" /> New chat
             </Button>
           </div>
-          <div className="p-2 space-y-1 max-h-60 md:max-h-[calc(100vh-130px)] overflow-y-auto">
+          <div className="p-2 space-y-1 max-h-60 md:max-h-[calc(100vh-260px)] overflow-y-auto">
             {chats.map((c) => (
               <button
                 key={c.name}

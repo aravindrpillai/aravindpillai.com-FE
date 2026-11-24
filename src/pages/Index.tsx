@@ -1,3 +1,4 @@
+import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import About from "@/components/About";
 import AISection from "@/components/AISection";
@@ -6,7 +7,8 @@ import Footer from "@/components/Footer";
 
 const Index = () => {
   return (
-    <main className="min-h-screen">
+    <main id="top" className="min-h-screen scroll-smooth">
+      <Navbar />
       <Hero />
       <About />
       <AISection />

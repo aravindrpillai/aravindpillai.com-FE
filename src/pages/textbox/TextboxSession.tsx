@@ -412,7 +412,7 @@ export default function TextboxSession({ code }: { code: string }) {
         retry = 0;
         setOnline(true);
         autoUnlockRef.current = true;
-        // "code" lets the server list this textbox by name at /listall/textbox (stored in plain text).
+        // "code" lets the server list this textbox by name in the admin panel (/admin/notepad; stored in plain text).
         ws?.send(JSON.stringify({ type: "open", box: box.boxId, code: codeRef.current }));
         pingTimer = window.setInterval(
           () => ws?.readyState === WebSocket.OPEN && ws.send('{"type":"ping"}'),

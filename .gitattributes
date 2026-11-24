@@ -1,0 +1,2 @@
+# Shell scripts must keep LF endings on the Linux server, even when committed from Windows.
+*.sh text eol=lf
