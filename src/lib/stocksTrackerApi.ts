@@ -1,7 +1,7 @@
 /**
  * Client for the prediction tracker (arp/stocks/tracker/...). Same `token` header as stocksApi.
  */
-import { StocksHttpError, type Horizon, type Market } from "@/lib/stocksApi";
+import { StocksHttpError, type Horizon, type Learning, type Market, type MethodId, type Verdict } from "@/lib/stocksApi";
 
 const BASE: string = import.meta.env.VITE_API_BASE_URL;
 
@@ -85,15 +85,65 @@ export interface Prediction {
   extended_alpha: number | null;
   extended_note: string;
   error: string;
+  win_probability: number | null;
+  expected_value: number | null;
+  methods: PredictionMethods;
   checkpoints: Checkpoint[];
   loss_analysis?: LossAnalysis | null;
   lessons?: Lesson[];
   suggestions?: Suggestion[];
 }
 
+export interface MethodCall {
+  score?: number;
+  probability?: number | null;
+  bullish?: boolean;
+  verdict?: Verdict;
+  confidence?: number | null;
+  weight?: number;
+}
+
+export type PredictionMethods = Partial<Record<MethodId, MethodCall>> & {
+  features?: Record<string, number>;
+  regime?: string;
+  ranks?: Record<string, number>;
+};
+
+export interface Mark {
+  now_price: number | null;
+  now_at: string | null;
+  now_return: number | null;
+  now_index_return: number | null;
+  now_alpha: number | null;
+  basis: "entry" | "suggested";
+}
+
+export interface Portfolio {
+  trades: number;
+  wins?: number;
+  losses?: number;
+  win_rate?: number;
+  avg_return?: number;
+  total_return?: number;
+  profit_factor?: number | null;
+  avg_win?: number | null;
+  avg_loss?: number | null;
+  avg_alpha?: number | null;
+  best?: { ticker: string; return: number; id: number };
+  worst?: { ticker: string; return: number; id: number };
+}
+
+export interface EquityPoint {
+  at: string;
+  cum: number;
+  ret: number;
+  ticker: string;
+  horizon: Horizon;
+}
+
 export interface LossAnalysis {
   trigger: "loss" | "underperformed" | "both";
-  method: "claude" | "rules";
+  method: "claude" | "openai" | "rules";
   cause: string;
   explanation: string;
   what_was_missed: string;
@@ -153,6 +203,9 @@ export interface HorizonRecord {
 }
 
 export interface TrackerSummary {
+  portfolio: Portfolio;
+  equity: EquityPoint[];
+  learning: Partial<Record<Horizon, Learning>>;
   horizons: HorizonRecord[];
   pass_running: boolean;
   scheduler: string;
@@ -186,6 +239,8 @@ export const trackerApi = {
   predictions: (token: string, market: Market, status: "open" | "closed" | "all", horizon?: Horizon | "") =>
     request<Prediction[]>("GET", `stocks/tracker/predictions/?market=${market}&status=${status}${horizon ? `&horizon=${horizon}` : ""}`, token),
   prediction: (token: string, id: number) => request<Prediction>("GET", `stocks/tracker/predictions/${id}/`, token),
+  marks: (token: string, market: Market, ids: number[]) =>
+    request<Record<string, Mark>>("GET", `stocks/tracker/marks/?market=${market}${ids.length ? `&ids=${ids.join(",")}` : ""}`, token),
   evaluate: (token: string) => request<{ started: boolean }>("POST", "stocks/tracker/evaluate/", token),
   lessons: (token: string, market: Market) => request<Lesson[]>("GET", `stocks/tracker/lessons/?market=${market}`, token),
   setLesson: (token: string, id: number, active: boolean) => request<Lesson>("PATCH", `stocks/tracker/lessons/${id}/`, token, { active }),

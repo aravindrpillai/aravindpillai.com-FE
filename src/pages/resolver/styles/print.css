@@ -1,0 +1,11 @@
+@media print {
+  @page { margin: 18mm; }
+  .resolver { background: #fff; color: #000; font-size: 11pt; }
+  .resolver .topbar, .resolver .banner, .resolver .toasts, .resolver .no-print, .resolver .composer, .resolver .skip-link { display: none !important; }
+  .resolver .main { max-width: none; padding: 0; }
+  .resolver .card { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
+  .resolver a { color: #000; text-decoration: underline; }
+  .resolver a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 9pt; }
+  .resolver h1, .resolver h2, .resolver h3 { break-after: avoid; }
+  .resolver .option { border-left: 3px solid #000; }
+}

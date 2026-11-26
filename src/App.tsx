@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+// import { lazy, Suspense } from "react";  // only used by Resolver (disabled below)
 import Index from "./pages/Index";
 import Blog from "./pages/Blog";
 import Videos from "./pages/Videos";
@@ -24,6 +25,10 @@ import FileAnalyserUpload from "./pages/playground/fileanalyser/Upload";
 import FileAnalyserChat from "./pages/playground/fileanalyser/Chat";
 import FinanceQuestions from "./pages/playground/finance/Questions";
 import FinanceSummary from "./pages/playground/finance/Summary";
+
+// Resolver (AI conflict resolution) is DISABLED for now (code kept in src/pages/resolver).
+// To re-enable: uncomment this, the react import above and the /resolver route below.
+// const ResolverApp = lazy(() => import("./pages/resolver/app/ResolverApp"));
 
 const queryClient = new QueryClient();
 
@@ -63,6 +68,16 @@ const App = () => (
 
           {/* Stocks: news -> analysis -> Claude review -> top picks. Everyone signs in with a user from admin panel -> Stocks (the owner too) */}
           <Route path="/stocks" element={<StocksPage />} />
+
+          {/* Resolver: AI-assisted conflict resolution. Backend: Django `resolver` app (arp/resolver/). DISABLED for now. */}
+          {/* <Route
+            path="/resolver/*"
+            element={
+              <Suspense fallback={null}>
+                <ResolverApp />
+              </Suspense>
+            }
+          /> */}
 
           {/* Playground apps. Each asks for its own 4-digit code (admin panel -> Playground) or offers a free
               30-minute trial per IP (then a 24-hour wait). AI keys and models: admin panel -> AI. */}

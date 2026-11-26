@@ -11,18 +11,22 @@ const PIPELINE_STAGES = [
   { id: "selecting", label: "Pick candidates" },
   { id: "analysing", label: "Analyse" },
   { id: "aggregating", label: "Rank" },
+  { id: "reporting", label: "Report" },
   { id: "done", label: "Done" },
 ];
 
-export default function ProgressPanel({ run, events, candidates, onOpen }: {
+export default function ProgressPanel({ run, events, candidates, onOpen, collapsed = false }: {
   run: Run;
   events: PipelineEvent[];
   candidates: CandidateStage[];
   onOpen: (candidateId: number) => void;
+  collapsed?: boolean;
 }) {
   const s = run.stats;
   const active = run.status === "queued" || run.status === "running";
   const [, force] = useState(0);
+  const [expanded, setExpanded] = useState(!collapsed);
+  useEffect(() => setExpanded(!collapsed), [collapsed, run.id]);
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => force((n) => n + 1), 1000);
@@ -30,23 +34,38 @@ export default function ProgressPanel({ run, events, candidates, onOpen }: {
   }, [active]);
 
   if (!s) return null;
-  const stageIdx = PIPELINE_STAGES.findIndex((x) => x.id === (run.status === "completed" ? "done" : s.stage));
+  const STEPS = run.kind === "single" ? PIPELINE_STAGES : PIPELINE_STAGES.filter((x) => x.id !== "reporting");
+  const stageIdx = STEPS.findIndex((x) => x.id === (run.status === "completed" ? "done" : s.stage));
+  const title = run.kind === "single" ? `${run.symbol} analysis` : `${MARKET_META[run.market]?.label ?? run.market} scan`;
+  const tokens = (x?: { input_tokens: number; output_tokens: number }) => x ? `${((x.input_tokens + x.output_tokens) / 1000).toFixed(1)}k tokens` : "";
+
+  if (!expanded) {
+    return (
+      <section className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-border bg-card px-4 py-2.5 text-xs shadow-soft">
+        <span className="text-sm font-semibold">{title}</span>
+        <span className="text-muted-foreground">#{run.id} · {duration(run.started_at || run.created_at, run.finished_at)}</span>
+        <RunBadge run={run} />
+        <span className="text-muted-foreground">{s.articles.fetched} articles · {s.stocks_extracted} stocks · {s.queue.published} analyses ·
+          Claude {s.ai.calls} calls · ChatGPT {s.openai?.calls ?? 0} calls · {s.picks} picks</span>
+        <button onClick={() => setExpanded(true)} className="ml-auto font-medium text-primary hover:underline">Show run details</button>
+      </section>
+    );
+  }
 
   return (
-    <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
+    <section className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-soft sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display text-xl">
-          {run.kind === "single" ? `${run.symbol} analysis` : `${MARKET_META[run.market]?.label ?? run.market} scan`} · run #{run.id}
-        </h2>
+        <h2 className="text-base font-semibold tracking-tight">{title} <span className="font-normal text-muted-foreground">· run #{run.id}</span></h2>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <RunBadge run={run} />
           <span className="tabular-nums">⏱ {duration(run.started_at || run.created_at, active ? null : run.finished_at)}</span>
+          {collapsed && <button onClick={() => setExpanded(false)} className="text-xs font-medium text-primary hover:underline">Hide</button>}
         </div>
       </div>
 
       {/* stage stepper */}
-      <ol className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-        {PIPELINE_STAGES.map((st, i) => {
+      <ol className={`grid grid-cols-3 gap-2 ${run.kind === "single" ? "sm:grid-cols-7" : "sm:grid-cols-6"}`}>
+        {STEPS.map((st, i) => {
           const rec = s.stages.find((x) => x.name === st.id);
           const done = run.status === "completed" ? true : i < stageIdx;
           const current = active && i === stageIdx;
@@ -66,14 +85,16 @@ export default function ProgressPanel({ run, events, candidates, onOpen }: {
       </ol>
 
       {/* counters */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-9">
         <Counter label="Articles fetched" value={s.articles.fetched} />
         <Counter label="Unique stories" value={s.articles.unique} />
         <Counter label="Stocks extracted" value={s.stocks_extracted} />
         {HORIZONS.map((h) => <Counter key={h.id} label={`${h.label} candidates`} value={s.candidates[h.id] ?? 0} />)}
-        <Counter label="Claude calls" value={s.ai.calls} hint={s.ai.enabled ? `${((s.ai.input_tokens + s.ai.output_tokens) / 1000).toFixed(1)}k tokens` : "off"} />
+        <Counter label="Claude calls" value={s.ai.calls} hint={s.ai.enabled ? tokens(s.ai) : "off"} />
+        <Counter label="ChatGPT calls" value={s.openai?.calls ?? 0} hint={s.openai?.enabled ? tokens(s.openai) : "off"} />
         <Counter label="Picks" value={s.picks} />
       </div>
+      <LearningLine stats={s} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Sources stats={s} />
@@ -99,9 +120,24 @@ export function RunBadge({ run }: { run: Run }) {
   return <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${map[run.status]}`}>{run.cancel_requested && run.status === "running" ? "cancelling…" : run.status}</span>;
 }
 
+function LearningLine({ stats }: { stats: RunStats }) {
+  const l = stats.learning;
+  if (!l || !Object.keys(l).length) return null;
+  const active = HORIZONS.filter((h) => l[h.id]?.active);
+  const closed = HORIZONS.reduce((n, h) => n + (l[h.id]?.closed ?? 0), 0);
+  return (
+    <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+      <b className="text-foreground">Learning applied: </b>
+      {active.length
+        ? active.map((h) => `${h.label} (${l[h.id]!.closed} closed; weights ${Object.entries(l[h.id]!.weights).map(([m, w]) => `${m} ${w.toFixed(2)}`).join(", ")})`).join(" · ")
+        : `${closed} closed prediction(s) so far in this market — the configured weights are used until each horizon has enough history.`}
+    </div>
+  );
+}
+
 function Counter({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
-    <div className="rounded-xl border border-border px-3 py-2">
+    <div className="rounded-lg border border-border px-3 py-2">
       <div className="text-[11px] leading-tight text-muted-foreground">{label}</div>
       <div className="text-xl font-semibold tabular-nums">{value ?? 0}</div>
       {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
@@ -168,7 +204,8 @@ function QueueBox({ stats }: { stats: RunStats }) {
         </div>
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        {q.published} items published · {stats.ai.enabled ? `Claude ${stats.ai.model ?? ""}` : `Claude off: ${stats.ai.reason}`}
+        {q.published} items published · {stats.ai.enabled ? `Claude ${stats.ai.model ?? ""}` : `Claude off: ${stats.ai.reason}`} ·{" "}
+        {stats.openai?.enabled ? `ChatGPT ${stats.openai.model ?? ""}` : `ChatGPT off${stats.openai?.reason ? `: ${stats.openai.reason}` : ""}`}
       </p>
     </div>
   );
@@ -200,7 +237,7 @@ function StockStages({ candidates, onOpen }: { candidates: CandidateStage[]; onO
           );
         })}
       </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">Queued → Fetching data → Technical analysis → AI review → Scored → Selected / Rejected</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">Queued → Fetching data → ~70 indicators + backtest → Claude & ChatGPT (parallel) → Ensemble score → Selected / Rejected</p>
     </div>
   );
 }

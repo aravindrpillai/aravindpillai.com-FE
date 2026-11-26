@@ -128,10 +128,22 @@ type WsEvent =
   | { type: "cleared" }
   | { type: "pong" };
 
+/** Response of GET qchat/sync/ (the HTTP fallback). */
+type SyncData = {
+  messages: ApiMsg[]; // visible messages newer than lastid
+  ids: number[]; // every message id the viewer can still see
+  opened: Record<string, string[]>; // one-time upload id -> users that opened it
+};
+
 // ----- Constants -----
 const LOCK_AFTER_HIDDEN_MS = 0; // lock as soon as the tab/app goes to background
 const WS_PING_MS = 25_000; // keep-alive so proxies don't drop an idle socket
+const WS_PONG_TIMEOUT_MS = 10_000; // no pong within this -> socket is dead (half-open), reconnect
+const WS_CONNECT_TIMEOUT_MS = 8_000; // no auth_ok within this -> give up on this attempt
 const WS_MAX_RETRY_MS = 30_000;
+// HTTP fallback: while the socket is not live, poll the sync endpoint so the chat keeps working.
+const POLL_MS = 3_000;
+const POLL_MAX_MS = 15_000; // back off up to this on repeated poll errors
 const WS_CLOSE_AUTH_FAILED = 4001;
 const WS_CLOSE_REVOKED = 4002;
 // Max plaintext size. The server limit (QCHAT_MAX_FILE_BYTES) is on the ciphertext, which adds
@@ -225,7 +237,8 @@ const QChatV3 = () => {
 
   // ----- API + realtime state -----
   const [loading, setLoading] = useState(false);
-  const [connected, setConnected] = useState(false);
+  // "live" = WebSocket, "polling" = HTTP fallback working, "offline" = neither reachable right now
+  const [link, setLink] = useState<"live" | "polling" | "offline">("offline");
   const lastIdRef = useRef(0);
 
   // ----- Decrypted images (object URLs live only in memory) -----
@@ -527,40 +540,185 @@ const QChatV3 = () => {
     [getConversations, apiToUi, mergeMessages, forgetImage]
   );
 
+  /**
+   * Cheap catch-up over HTTP (qchat/sync/): new messages in full, plus the list of ids that still
+   * exist, so deletes / clears / view-once opens are picked up too. Used as the polling fallback
+   * while the WebSocket is down, and once after every (re)connect. Throws on failure.
+   */
+  const pollSync = useCallback(async () => {
+    if (!headers) throw new Error("locked");
+    const session = sessionRef.current;
+    const sinceId = lastIdRef.current;
+    const url = ApiClient.buildFullUrl(
+      (import.meta.env.VITE_QUICK_CHAT_SYNC ?? "qchat/sync/") + "?lastid=" + sinceId
+    );
+    // Time out a hung request so the next poll can try again (AbortSignal.timeout isn't on older Safari).
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => abort.abort(), 10_000);
+    let resp: Response;
+    try {
+      resp = await fetch(url, { method: "GET", headers, cache: "no-store", signal: abort.signal });
+    } finally {
+      window.clearTimeout(timer);
+    }
+    if (resp.status === 403) {
+      lock();
+      throw new Error("403");
+    }
+    if (!resp.ok) throw new Error(String(resp.status));
+    const sync = ((await resp.json())?.data ?? {}) as Partial<SyncData>;
+    const ids = sync.ids ?? [];
+    const opened = sync.opened ?? {};
+    const uiMsgs = await apiToUi(sync.messages ?? []);
+    if (session !== sessionRef.current) return;
+
+    const keep = new Set(ids.map(String));
+    // Anything at or below what the server has seen and not in `ids` was deleted / cleared / opened by me.
+    const known = Math.max(sinceId, ...ids, 0);
+    Array.from(imageCacheRef.current.keys()).forEach((id) => Number(id) <= known && !keep.has(id) && forgetImage(id));
+    setMessages((prev) =>
+      mergeMessages(
+        prev
+          .filter((m) => keep.has(m.id) || Number(m.id) > known)
+          .map((m) => (m.oneTime && opened[m.id] ? { ...m, openedBy: opened[m.id] } : m)),
+        uiMsgs
+      )
+    );
+    lastIdRef.current = Math.max(0, ...ids);
+  }, [headers, lock, apiToUi, mergeMessages, forgetImage]);
+
   // ---------------------------
-  // Realtime (WebSocket) - replaces polling
+  // Realtime: WebSocket first, HTTP polling as automatic failover.
+  //  - Each socket attempt must reach auth_ok within WS_CONNECT_TIMEOUT_MS, and each ping must be
+  //    answered within WS_PONG_TIMEOUT_MS, otherwise the socket is dropped. This catches half-open
+  //    sockets that never fire onclose (mobile network switches, proxies silently dropping idle links).
+  //  - While the socket is not live, qchat/sync/ is polled so the chat keeps working, and the socket
+  //    keeps retrying in the background. Polling stops as soon as the socket is live again.
+  //  - Auth/revoke closes (4001/4002) are confirmed over HTTP: only a 403 there locks the chat, so a
+  //    socket-side glitch never kicks the user out.
   // ---------------------------
-  const handlersRef = useRef({ ingest, resync, lock, forgetImage, forgetAllImages });
+  const handlersRef = useRef({ ingest, resync, pollSync, lock, forgetImage, forgetAllImages });
   useEffect(() => {
-    handlersRef.current = { ingest, resync, lock, forgetImage, forgetAllImages };
-  }, [ingest, resync, lock, forgetImage, forgetAllImages]);
+    handlersRef.current = { ingest, resync, pollSync, lock, forgetImage, forgetAllImages };
+  }, [ingest, resync, pollSync, lock, forgetImage, forgetAllImages]);
 
   useEffect(() => {
     if (!keys || !name) return;
 
     let ws: WebSocket | null = null;
+    let live = false; // the current socket is authenticated and answering pings
     let stopped = false;
     let retry = 0;
-    let isFirstAuth = true;
     let retryTimer: number | null = null;
+    let connectTimer: number | null = null;
     let pingTimer: number | null = null;
+    let pongTimer: number | null = null;
+    let pollTimer: number | null = null;
+    let polling = false;
+    let pollBusy = false;
+    let pollFails = 0;
 
-    const clearTimers = () => {
-      if (retryTimer !== null) window.clearTimeout(retryTimer);
+    const clear = (t: number | null) => {
+      if (t !== null) window.clearTimeout(t);
+    };
+    const clearSocketTimers = () => {
+      clear(connectTimer);
+      clear(pongTimer);
       if (pingTimer !== null) window.clearInterval(pingTimer);
-      retryTimer = pingTimer = null;
+      connectTimer = pongTimer = pingTimer = null;
+    };
+
+    // ----- HTTP polling fallback -----
+    const schedulePoll = (delay: number) => {
+      clear(pollTimer);
+      pollTimer = window.setTimeout(runPoll, delay);
+    };
+    const runPoll = async () => {
+      pollTimer = null;
+      if (!polling || stopped || live || pollBusy) return;
+      pollBusy = true;
+      try {
+        await handlersRef.current.pollSync(); // a 403 locks the chat (and ends this effect)
+        pollFails = 0;
+        if (!stopped && !live) setLink("polling");
+      } catch {
+        pollFails += 1;
+        if (!stopped && !live) setLink("offline");
+      } finally {
+        pollBusy = false;
+      }
+      if (polling && !stopped && !live) {
+        schedulePoll(Math.min(POLL_MAX_MS, POLL_MS * 2 ** Math.max(0, pollFails - 1)));
+      }
+    };
+    const startPolling = () => {
+      if (stopped || live) return;
+      if (!polling) {
+        polling = true;
+        pollFails = 0;
+      }
+      if (!pollBusy) schedulePoll(0);
+    };
+    const stopPolling = () => {
+      polling = false;
+      clear(pollTimer);
+      pollTimer = null;
+    };
+
+    // ----- WebSocket -----
+    const socketDown = () => {
+      live = false;
+      clearSocketTimers();
+      if (stopped) return;
+      startPolling();
+      clear(retryTimer);
+      const delay = Math.min(WS_MAX_RETRY_MS, 1000 * 2 ** retry);
+      retry += 1;
+      retryTimer = window.setTimeout(connect, delay);
+    };
+
+    /** Detach + close a socket without waiting for onclose (a dead socket may never fire it). */
+    const drop = (sock: WebSocket, failover = true) => {
+      sock.onopen = sock.onmessage = sock.onerror = sock.onclose = null;
+      try {
+        sock.close(1000);
+      } catch {
+        /* already closed */
+      }
+      if (sock === ws) {
+        ws = null;
+        if (failover) socketDown();
+      }
     };
 
     const connect = () => {
+      clear(retryTimer);
+      retryTimer = null;
       if (stopped) return;
-      ws = new WebSocket(buildWsUrl());
+      if (ws) drop(ws, false);
+      clearSocketTimers();
+      live = false;
 
-      ws.onopen = () => {
+      let sock: WebSocket;
+      try {
+        sock = new WebSocket(buildWsUrl());
+      } catch (e) {
+        console.error("WebSocket could not be created:", e);
+        socketDown();
+        return;
+      }
+      ws = sock;
+      connectTimer = window.setTimeout(() => drop(sock), WS_CONNECT_TIMEOUT_MS);
+
+      sock.onopen = () => {
         // Token goes in the first message, never in the URL (keeps it out of logs).
-        ws?.send(JSON.stringify({ type: "auth", name, token: keys.token, sender: sender ?? "" }));
+        sock.send(JSON.stringify({ type: "auth", name, token: keys.token, sender: sender ?? "" }));
       };
 
-      ws.onmessage = (ev) => {
+      sock.onmessage = (ev) => {
+        // Any frame proves the link is alive.
+        clear(pongTimer);
+        pongTimer = null;
         let msg: WsEvent;
         try {
           msg = JSON.parse(ev.data);
@@ -570,15 +728,19 @@ const QChatV3 = () => {
         const h = handlersRef.current;
         switch (msg.type) {
           case "auth_ok":
+            clear(connectTimer);
+            connectTimer = null;
+            live = true;
             retry = 0;
-            setConnected(true);
-            pingTimer = window.setInterval(
-              () => ws?.readyState === WebSocket.OPEN && ws.send('{"type":"ping"}'),
-              WS_PING_MS
-            );
-            // Load history (first time) or re-sync after a reconnect.
-            h.resync(isFirstAuth);
-            isFirstAuth = false;
+            stopPolling();
+            setLink("live");
+            pingTimer = window.setInterval(() => {
+              if (sock.readyState !== WebSocket.OPEN) return drop(sock);
+              sock.send('{"type":"ping"}');
+              if (pongTimer === null) pongTimer = window.setTimeout(() => drop(sock), WS_PONG_TIMEOUT_MS);
+            }, WS_PING_MS);
+            // Catch up on anything that happened before this socket subscribed (or while it was down).
+            h.pollSync().catch(() => h.resync(false));
             break;
           case "message":
             h.ingest([msg.data]);
@@ -613,38 +775,44 @@ const QChatV3 = () => {
         }
       };
 
-      ws.onclose = (ev) => {
-        setConnected(false);
-        clearTimers();
-        if (stopped) return;
+      sock.onclose = (ev) => {
+        if (sock !== ws) return;
+        ws = null;
         if (ev.code === WS_CLOSE_AUTH_FAILED || ev.code === WS_CLOSE_REVOKED) {
-          handlersRef.current.lock();
-          return;
+          console.warn("QChat socket closed with", ev.code, "- checking access over HTTP");
         }
-        const delay = Math.min(WS_MAX_RETRY_MS, 1000 * 2 ** retry);
-        retry += 1;
-        retryTimer = window.setTimeout(connect, delay);
+        // Falls back to polling right away; the first poll locks the chat if access was really revoked.
+        socketDown();
       };
     };
 
-    // Reconnect immediately when the network comes back.
+    // Network back: retry the socket and poll immediately instead of waiting for the backoff.
     const onOnline = () => {
-      if (ws && ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CONNECTING) {
-        clearTimers();
-        retry = 0;
-        connect();
-      }
+      if (stopped) return;
+      retry = 0;
+      if (!live) connect();
+      if (polling && !pollBusy) schedulePoll(0);
+    };
+    // Network gone: the socket is almost certainly dead; don't wait for it to time out.
+    const onOffline = () => {
+      if (ws) drop(ws);
     };
     window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
 
+    // Initial history over HTTP right away, so the chat shows even if the socket never connects.
+    handlersRef.current.resync(true);
     connect();
 
     return () => {
       stopped = true;
-      clearTimers();
+      stopPolling();
+      clear(retryTimer);
+      clearSocketTimers();
       window.removeEventListener("online", onOnline);
-      ws?.close(1000);
-      setConnected(false);
+      window.removeEventListener("offline", onOffline);
+      if (ws) drop(ws, false);
+      setLink("offline");
     };
   }, [keys, name, sender]);
 
@@ -1411,8 +1579,10 @@ const QChatV3 = () => {
               <h1 className="text-lg font-semibold text-foreground truncate">{formatName(name)}</h1>
               {keys && (
                 <span
-                  className={`h-2 w-2 rounded-full shrink-0 ${connected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
-                  title={connected ? "Live" : "Reconnecting..."}
+                  className={`h-2 w-2 rounded-full shrink-0 ${
+                    link === "live" ? "bg-emerald-500" : link === "polling" ? "bg-sky-500" : "bg-amber-500 animate-pulse"
+                  }`}
+                  title={link === "live" ? "Live" : link === "polling" ? "Connected (backup mode)" : "Reconnecting..."}
                 />
               )}
             </div>
